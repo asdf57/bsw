@@ -53,7 +53,7 @@ function h($value): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Better Splitwise</title>
+  <title>BSW</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
     h1 { margin-bottom: 8px; }
