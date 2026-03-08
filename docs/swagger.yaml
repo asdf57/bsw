@@ -1,0 +1,147 @@
+basePath: /
+definitions:
+  models.Payment:
+    properties:
+      amount:
+        format: float64
+        type: number
+      description:
+        type: string
+      owers:
+        items:
+          type: string
+        type: array
+      payer:
+        type: string
+    type: object
+  models.User:
+    properties:
+      name:
+        type: string
+    type: object
+externalDocs:
+  description: OpenAPI
+  url: https://swagger.io/resources/open-api/
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is a sample server celler server.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Swagger Example API
+  version: "1.0"
+paths:
+  /api/v1/health:
+    get:
+      responses: {}
+      summary: Health check
+  /api/v1/payment:
+    post:
+      consumes:
+      - application/json
+      description: save a payment in the database
+      parameters:
+      - description: payment data
+        in: body
+        name: payment
+        required: true
+        schema:
+          $ref: '#/definitions/models.Payment'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Payment'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create a new payment
+  /api/v1/payment/{id}:
+    get:
+      parameters:
+      - description: Payment ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses: {}
+      summary: Get a payment by ID
+  /api/v1/payment/all:
+    get:
+      responses: {}
+      summary: Get all payments
+  /api/v1/user:
+    post:
+      consumes:
+      - application/json
+      description: save a user in the database
+      parameters:
+      - description: user data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create a new user
+  /api/v1/user/{name}:
+    delete:
+      parameters:
+      - description: user name
+        in: path
+        name: name
+        required: true
+        type: string
+      responses: {}
+      summary: Delete a user by user by name
+    get:
+      parameters:
+      - description: User name
+        in: path
+        name: name
+        required: true
+        type: string
+      responses: {}
+      summary: Get a user by name
+  /api/v1/user/all:
+    get:
+      responses: {}
+      summary: Get all users
+securityDefinitions:
+  BasicAuth:
+    type: basic
+swagger: "2.0"

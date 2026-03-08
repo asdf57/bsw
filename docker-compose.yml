@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: db
+    command: -p 5433
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: bswdb
+    ports:
+      - "5433:5433"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -p 5433"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: bsw
+    ports:
+      - "8080:8080"
+    environment:
+      DSN: postgres://user:password@postgres:5433/bswdb?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: bsw-frontend
+    ports:
+      - "8081:80"
+    environment:
+      API_BASE: http://app:8080
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
