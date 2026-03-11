@@ -47,6 +47,11 @@ func main() {
 		log.Fatal("I have failed to create the User table")
 	}
 
+	log.Println("Creating the balance table")
+	if err := db.AutoMigrate(&models.BalanceDBEntry{}); err != nil {
+		log.Fatal("I have failed to create the Balance table")
+	}
+
 	docs.SwaggerInfo.Title = "BSW"
 	docs.SwaggerInfo.Description = "Free is good!"
 	docs.SwaggerInfo.Version = "1.0"
@@ -64,6 +69,7 @@ func main() {
 			payments.GET("/:id", ctrl.GetPayment)
 			payments.GET("/all", ctrl.GetPayments)
 			payments.POST("", ctrl.PostPayment)
+			payments.DELETE("/:id", ctrl.DeletePayment)
 		}
 
 		user := v1.Group("/user")
@@ -72,6 +78,12 @@ func main() {
 			user.GET("/:name", ctrl.GetUser)
 			user.GET("/all", ctrl.GetUsers)
 			user.DELETE("/:name", ctrl.DeleteUser)
+		}
+
+		balance := v1.Group("/balance")
+		{
+			balance.GET("/all", ctrl.GetBalances)
+			balance.POST("/all", ctrl.UpdateBalances)
 		}
 
 		health := v1.Group("/health")

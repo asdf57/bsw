@@ -24,6 +24,16 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/v1/balance/all": {
+            "get": {
+                "summary": "Get all balances",
+                "responses": {}
+            },
+            "post": {
+                "summary": "Update all balances",
+                "responses": {}
+            }
+        },
         "/api/v1/health": {
             "get": {
                 "summary": "Health check",
@@ -88,6 +98,19 @@ const docTemplate = `{
         "/api/v1/payment/{id}": {
             "get": {
                 "summary": "Get a payment by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Payment ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {}
+            },
+            "delete": {
+                "summary": "Delete a payment by ID",
                 "parameters": [
                     {
                         "type": "integer",

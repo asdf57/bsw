@@ -38,7 +38,7 @@ services:
     ports:
       - "8081:80"
     environment:
-      API_BASE: http://app:8080
+      API_BASE: http://localhost:8080
     depends_on:
       - app
     restart: unless-stopped

@@ -35,6 +35,33 @@ func (ctrl *Controller) resolveUserIdFromName(name string) (*uint, error) {
 	return &dbEntry.ID, nil
 }
 
+func (ctrl *Controller) getUsers() ([]models.UserDBEntry, error) {
+	var users []models.UserDBEntry
+
+	if err := ctrl.db.Find(&users).Error; err != nil {
+		log.Printf("db error while fetching users: %v", err)
+		return nil, err
+	}
+
+	return users, nil
+}
+
+func (ctrl *Controller) resolveUserNameFromId(id uint) (*string, error) {
+	var dbEntry models.UserDBEntry
+
+	if err := ctrl.db.First(&dbEntry, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("user was not found: %v", err)
+			return nil, err
+		}
+
+		log.Printf("unhandled error while searching for user record: %v", err)
+		return nil, err
+	}
+
+	return &dbEntry.Name, nil
+}
+
 // GetPayment godoc
 // @Summary Get a payment by ID
 // @Param id path int true "Payment ID"
@@ -143,6 +170,34 @@ func (ctrl *Controller) PostPayment(c *gin.Context) {
 
 	log.Printf("Received payment request: %+v\n", dbReq)
 	c.JSON(http.StatusOK, req)
+}
+
+// DeletePayment godoc
+// @Summary Delete a payment by ID
+// @Param id path int true "Payment ID"
+// @Router /api/v1/payment/{id} [delete]
+func (ctrl *Controller) DeletePayment(c *gin.Context) {
+	id := c.Param("id")
+
+	var p models.PaymentDBEntry
+	if err := ctrl.db.First(&p, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
+			return
+		}
+
+		log.Printf("db error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+
+	if err := ctrl.db.Unscoped().Delete(&p).Error; err != nil {
+		log.Printf("failed to delete payment: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not delete payment"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"info": "payment deleted"})
 }
 
 // GetDbHealth godoc
@@ -278,4 +333,174 @@ func (ctrl *Controller) GetUsers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, users)
+}
+
+// UpdateBalances godoc
+// @Summary Update all balances
+// @Router /api/v1/balance/all [post]
+func (ctrl *Controller) UpdateBalances(c *gin.Context) {
+	// to do this, we need to go through all the payments and calculate how much each user owes to each other user, then update the balances table accordingly
+	type debtKey struct {
+		From uint
+		To   uint
+	}
+
+	var payments []models.PaymentDBEntry
+	if err := ctrl.db.Preload("Owers").Find(&payments).Error; err != nil {
+		log.Printf("db error while fetching payments: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while fetching payments"})
+		return
+	}
+
+	raw := map[debtKey]float64{}
+
+	for _, paymentDbEntry := range payments {
+		payerId := paymentDbEntry.PayerID
+		owers := paymentDbEntry.Owers
+
+		amountPerOwer := paymentDbEntry.Amount / float64(len(owers))
+
+		for _, ower := range owers {
+			raw[debtKey{From: ower.ID, To: payerId}] += amountPerOwer
+
+			// Let's take this opportunity to also add an entry for the inverse if not already defined
+			if _, ok := raw[debtKey{From: payerId, To: ower.ID}]; !ok {
+				raw[debtKey{From: payerId, To: ower.ID}] = 0.0
+			}
+		}
+	}
+
+	// Now that we've gone through each payment and calculated the raw debts, we need to
+	// calculate the ACTUAL debts. If A owes B $30 and B owes A $10, then you can rewrite
+	// this as A owing B $20 and B owing A $0
+	for debtEntry, amount := range raw {
+		fromUser := debtEntry.From // person A
+		toUser := debtEntry.To     // person B
+
+		inverseDebt := raw[debtKey{From: toUser, To: fromUser}]
+
+		if amount > inverseDebt {
+			raw[debtEntry] = amount - inverseDebt
+			raw[debtKey{From: toUser, To: fromUser}] = 0.0
+		}
+	}
+
+	// When outputting to the API, we should use human-friendly names, not ids
+	var response []models.Balance
+
+	// Print the raw balances for debugging with the user names instead of ids
+	for debtEntry, amount := range raw {
+		if amount == 0 {
+			continue // skip zero balances
+		}
+
+		fromUserName, err := ctrl.resolveUserNameFromId(debtEntry.From)
+		if err != nil {
+			log.Printf("db error while fetching user name from id for balance: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "db error while fetching user name from id for balance"})
+			return
+		}
+
+		toUserName, err := ctrl.resolveUserNameFromId(debtEntry.To)
+		if err != nil {
+			log.Printf("db error while fetching user name from id for balance: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "db error while fetching user name from id for balance"})
+			return
+		}
+
+		response = append(response, models.Balance{
+			FromUser: *fromUserName,
+			ToUser:   *toUserName,
+			Amount:   amount,
+		})
+
+		log.Printf("Balance: %s owes %s: $%.2f\n", *fromUserName, *toUserName, amount)
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// GetBalances godoc
+// @Summary Get all balances
+// @Router /api/v1/balance/all [get]
+func (ctrl *Controller) GetBalances(c *gin.Context) {
+	// to do this, we need to go through all the payments and calculate how much each user owes to each other user, then update the balances table accordingly
+	type debtKey struct {
+		From uint
+		To   uint
+	}
+
+	var payments []models.PaymentDBEntry
+	if err := ctrl.db.Preload("Owers").Find(&payments).Error; err != nil {
+		log.Printf("db error while fetching payments: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while fetching payments"})
+		return
+	}
+
+	raw := map[debtKey]float64{}
+
+	for _, paymentDbEntry := range payments {
+		payerId := paymentDbEntry.PayerID
+		owers := paymentDbEntry.Owers
+
+		amountPerOwer := paymentDbEntry.Amount / float64(len(owers))
+
+		for _, ower := range owers {
+			raw[debtKey{From: ower.ID, To: payerId}] += amountPerOwer
+
+			// Let's take this opportunity to also add an entry for the inverse if not already defined
+			if _, ok := raw[debtKey{From: payerId, To: ower.ID}]; !ok {
+				raw[debtKey{From: payerId, To: ower.ID}] = 0.0
+			}
+		}
+	}
+
+	// Now that we've gone through each payment and calculated the raw debts, we need to
+	// calculate the ACTUAL debts. If A owes B $30 and B owes A $10, then you can rewrite
+	// this as A owing B $20 and B owing A $0
+	for debtEntry, amount := range raw {
+		fromUser := debtEntry.From // person A
+		toUser := debtEntry.To     // person B
+
+		inverseDebt := raw[debtKey{From: toUser, To: fromUser}]
+
+		if amount > inverseDebt {
+			raw[debtEntry] = amount - inverseDebt
+			raw[debtKey{From: toUser, To: fromUser}] = 0.0
+		}
+	}
+
+	// When outputting to the API, we should use human-friendly names, not ids
+	var response []models.Balance
+
+	// Print the raw balances for debugging with the user names instead of ids
+	for debtEntry, amount := range raw {
+		if amount == 0 {
+			continue // skip zero balances
+		}
+
+		fromUserName, err := ctrl.resolveUserNameFromId(debtEntry.From)
+		if err != nil {
+			log.Printf("db error while fetching user name from id for balance: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "db error while fetching user name from id for balance"})
+			return
+		}
+
+		toUserName, err := ctrl.resolveUserNameFromId(debtEntry.To)
+		if err != nil {
+			log.Printf("db error while fetching user name from id for balance: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "db error while fetching user name from id for balance"})
+			return
+		}
+
+		response = append(response, models.Balance{
+			FromUser: *fromUserName,
+			ToUser:   *toUserName,
+			Amount:   amount,
+		})
+
+		log.Printf("Balance: %s owes %s: $%.2f\n", *fromUserName, *toUserName, amount)
+	}
+
+	c.JSON(http.StatusOK, response)
 }

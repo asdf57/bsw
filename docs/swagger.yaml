@@ -36,6 +36,13 @@ info:
   title: Swagger Example API
   version: "1.0"
 paths:
+  /api/v1/balance/all:
+    get:
+      responses: {}
+      summary: Get all balances
+    post:
+      responses: {}
+      summary: Update all balances
   /api/v1/health:
     get:
       responses: {}
@@ -73,6 +80,15 @@ paths:
             type: object
       summary: Create a new payment
   /api/v1/payment/{id}:
+    delete:
+      parameters:
+      - description: Payment ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses: {}
+      summary: Delete a payment by ID
     get:
       parameters:
       - description: Payment ID
