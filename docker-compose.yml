@@ -25,6 +25,11 @@ services:
       - "8080:8080"
     environment:
       DSN: postgres://user:password@postgres:5433/bswdb?sslmode=disable
+      PGUSER: user
+      PGPASSWORD: password
+      PGDATABASE: bswdb
+      PGPORT: 5433
+      PGHOST: postgres
     depends_on:
       postgres:
         condition: service_healthy

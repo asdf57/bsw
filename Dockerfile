@@ -11,6 +11,8 @@ COPY . .
 
 RUN go build -o bsw .
 
+RUN apk add --no-cache postgresql-client
+
 EXPOSE 8080
 
 CMD ["./bsw"]

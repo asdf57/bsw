@@ -36,6 +36,64 @@ info:
   title: Swagger Example API
   version: "1.0"
 paths:
+  /api/v1/admin/backup:
+    post:
+      description: Starts a Postgres backup job (pg_dump)
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Trigger a database backup
+      tags:
+      - admin
+  /api/v1/admin/backup/{filename}:
+    get:
+      description: Downloads a Postgres backup file
+      parameters:
+      - description: Backup filename
+        in: path
+        name: filename
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Download a database backup
+      tags:
+      - admin
   /api/v1/balance/all:
     get:
       responses: {}

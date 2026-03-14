@@ -14,6 +14,7 @@ type PaymentDBEntry struct {
 	Description string
 	Date        time.Time
 	PayerID     uint
+	PayerName   string
 	Owers       []UserDBEntry `gorm:"many2many:payment_owers;constraint:OnDelete:CASCADE;"`
 }
 

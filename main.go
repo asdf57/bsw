@@ -90,6 +90,12 @@ func main() {
 		{
 			health.GET("", ctrl.GetDbHealth)
 		}
+
+		admin := v1.Group("/admin")
+		{
+			admin.POST("/backup", ctrl.BackupDB)
+			admin.GET("/backup/:filename", ctrl.GetBackup)
+		}
 	}
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

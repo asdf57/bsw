@@ -18,6 +18,94 @@
     "host": "localhost:8080",
     "basePath": "/",
     "paths": {
+        "/api/v1/admin/backup": {
+            "post": {
+                "description": "Starts a Postgres backup job (pg_dump)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Trigger a database backup",
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/backup/{filename}": {
+            "get": {
+                "description": "Downloads a Postgres backup file",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Download a database backup",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Backup filename",
+                        "name": "filename",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/balance/all": {
             "get": {
                 "summary": "Get all balances",
