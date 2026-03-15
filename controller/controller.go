@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/asdf57/bsw/models"
@@ -18,6 +20,34 @@ import (
 
 type Controller struct {
 	db *gorm.DB
+}
+
+func fetchExchangeRate(fromCurrency string, toCurrency string) (float64, error) {
+	// Make a GET request to the exchange rate API
+	url := fmt.Sprintf("https://api.frankfurter.dev/v1/latest?base=%s", fromCurrency)
+	resp, err := http.Get(url)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch exchange rates: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("exchange rate API returned non-200 status: %d", resp.StatusCode)
+	}
+
+	var data struct {
+		Rates map[string]float64 `json:"rates"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return 0, fmt.Errorf("failed to decode exchange rate response: %w", err)
+	}
+
+	rate, ok := data.Rates[toCurrency]
+	if !ok {
+		return 0, fmt.Errorf("exchange rate not found for currency: %s", toCurrency)
+	}
+
+	return rate, nil
 }
 
 func NewController(db *gorm.DB) *Controller {
@@ -596,4 +626,28 @@ func (ctrl *Controller) GetBalances(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, results)
+}
+
+// GetExchangeRate godoc
+// @Tags         admin
+// @Summary Get exchange rate between two currencies
+// @Param from query string true "Base currency code (e.g. USD)"
+// @Param to query string true "Target currency code (e.g. EUR)"
+// @Router /api/v1/admin/exchange-rate [get]
+func (ctrl *Controller) GetExchangeRate(c *gin.Context) {
+	fromCurrency := c.Query("from")
+	toCurrency := c.Query("to")
+
+	if fromCurrency == "" || toCurrency == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing from or to query parameter"})
+		return
+	}
+
+	rate, err := fetchExchangeRate(strings.ToUpper(fromCurrency), strings.ToUpper(toCurrency))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the desired exchange rate"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"rate": rate})
 }
