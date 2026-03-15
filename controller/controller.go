@@ -23,6 +23,10 @@ type Controller struct {
 }
 
 func fetchExchangeRate(fromCurrency string, toCurrency string) (float64, error) {
+	if fromCurrency == toCurrency {
+		return 1.0, nil
+	}
+
 	// Make a GET request to the exchange rate API
 	url := fmt.Sprintf("https://api.frankfurter.dev/v1/latest?base=%s", fromCurrency)
 	resp, err := http.Get(url)
