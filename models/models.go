@@ -10,21 +10,26 @@ import (
 // Tracks who made a payment and who owes money to whom
 type PaymentDBEntry struct {
 	gorm.Model
-	Amount      float64
-	Description string
-	Date        time.Time
-	PayerID     uint
-	PayerName   string
-	Owers       []UserDBEntry `gorm:"many2many:payment_owers;constraint:OnDelete:CASCADE;"`
+	Amount           float64
+	Description      string
+	Date             time.Time
+	PayerID          uint
+	PayerName        string
+	FromExchangeRate string
+	ToExchangeRate   string
+	ExchangeRate     float64
+	Owers            []UserDBEntry `gorm:"many2many:payment_owers;constraint:OnDelete:CASCADE;"`
 }
 
 func (PaymentDBEntry) TableName() string { return "payments" }
 
 type Payment struct {
-	Amount      float64
-	Payer       string
-	Description string
-	Owers       []string
+	Amount           float64
+	Payer            string
+	Description      string
+	FromExchangeRate string
+	ToExchangeRate   string
+	Owers            []string
 }
 
 // User table -- id, name

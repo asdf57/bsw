@@ -112,6 +112,31 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/admin/exchange-rate": {
+            "get": {
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get exchange rate between two currencies",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Base currency code (e.g. USD)",
+                        "name": "from",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target currency code (e.g. EUR)",
+                        "name": "to",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {}
+            }
+        },
         "/api/v1/balance/all": {
             "get": {
                 "summary": "Get all balances",
@@ -306,6 +331,9 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "fromExchangeRate": {
+                    "type": "string"
+                },
                 "owers": {
                     "type": "array",
                     "items": {
@@ -313,6 +341,9 @@ const docTemplate = `{
                     }
                 },
                 "payer": {
+                    "type": "string"
+                },
+                "toExchangeRate": {
                     "type": "string"
                 }
             }

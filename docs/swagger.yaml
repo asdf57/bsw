@@ -7,11 +7,15 @@ definitions:
         type: number
       description:
         type: string
+      fromExchangeRate:
+        type: string
       owers:
         items:
           type: string
         type: array
       payer:
+        type: string
+      toExchangeRate:
         type: string
     type: object
   models.User:
@@ -92,6 +96,23 @@ paths:
               type: string
             type: object
       summary: Download a database backup
+      tags:
+      - admin
+  /api/v1/admin/exchange-rate:
+    get:
+      parameters:
+      - description: Base currency code (e.g. USD)
+        in: query
+        name: from
+        required: true
+        type: string
+      - description: Target currency code (e.g. EUR)
+        in: query
+        name: to
+        required: true
+        type: string
+      responses: {}
+      summary: Get exchange rate between two currencies
       tags:
       - admin
   /api/v1/balance/all:

@@ -198,6 +198,13 @@ func (ctrl *Controller) PostPayment(c *gin.Context) {
 		return
 	}
 
+	exchangeRate, err := fetchExchangeRate(req.FromExchangeRate, req.ToExchangeRate)
+	if err != nil {
+		log.Printf("failed to fetch exchange rate: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch exchange rate"})
+		return
+	}
+
 	// check if the payer exists and get their id
 	var payer models.UserDBEntry
 	if err := ctrl.db.Where("name = ?", req.Payer).First(&payer).Error; err != nil {
@@ -236,12 +243,15 @@ func (ctrl *Controller) PostPayment(c *gin.Context) {
 
 	// build the db req
 	dbReq := models.PaymentDBEntry{
-		Amount:      req.Amount,
-		Description: req.Description,
-		Date:        time.Now(),
-		PayerID:     payer.ID,
-		PayerName:   payer.Name,
-		Owers:       owers,
+		Amount:           req.Amount,
+		Description:      req.Description,
+		Date:             time.Now(),
+		PayerID:          payer.ID,
+		PayerName:        payer.Name,
+		FromExchangeRate: req.FromExchangeRate,
+		ToExchangeRate:   req.ToExchangeRate,
+		ExchangeRate:     exchangeRate,
+		Owers:            owers,
 	}
 
 	// save the payment to the database
