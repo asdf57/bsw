@@ -95,6 +95,7 @@ func main() {
 		{
 			admin.POST("/backup", ctrl.BackupDB)
 			admin.GET("/backup/:filename", ctrl.GetBackup)
+			admin.GET("/exchange-rate", ctrl.GetExchangeRate)
 		}
 	}
 
