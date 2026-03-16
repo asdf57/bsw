@@ -118,6 +118,9 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
       overflow: hidden;
       box-shadow: var(--shadow);
     }
+    .card-payments {
+      overflow: visible;
+    }
 
     .add-form {
       display: flex;
@@ -128,7 +131,7 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
       background: var(--bg);
       border-bottom: 1px solid var(--border);
     }
-    .add-form input {
+    .add-form input:not([type="checkbox"]) {
       font-family: var(--sans);
       font-size: 13px;
       padding: 7px 11px;
@@ -140,10 +143,202 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
       transition: border-color 0.15s;
       min-width: 100px;
     }
-    .add-form input:focus { border-color: var(--accent); }
-    .add-form input::placeholder { color: var(--text-3); }
+    .add-form select {
+      font-family: var(--sans);
+      font-size: 13px;
+      padding: 7px 34px 7px 11px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background-color: var(--surface);
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--text-3) 50%),
+        linear-gradient(135deg, var(--text-3) 50%, transparent 50%);
+      background-position:
+        calc(100% - 16px) calc(50% - 1px),
+        calc(100% - 11px) calc(50% - 1px);
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+      min-width: 140px;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+    }
+    .add-form input:not([type="checkbox"]):focus { border-color: var(--accent); }
+    .add-form select:focus { border-color: var(--accent); }
+    .add-form input:not([type="checkbox"])::placeholder { color: var(--text-3); }
+    .add-form select:invalid { color: var(--text-3); }
+    .add-form select option { color: var(--text); }
     .add-form input[type="number"] { width: 100px; }
     .add-form .input-wide { flex: 1; min-width: 160px; }
+    .owers-dropdown {
+      position: relative;
+      min-width: 220px;
+    }
+    .payer-dropdown {
+      position: relative;
+      min-width: 220px;
+    }
+    .payer-trigger {
+      width: 100%;
+      height: 33px;
+      padding: 7px 34px 7px 11px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background-color: var(--surface);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: border-color 0.15s;
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--text-3) 50%),
+        linear-gradient(135deg, var(--text-3) 50%, transparent 50%);
+      background-position:
+        calc(100% - 16px) calc(50% - 1px),
+        calc(100% - 11px) calc(50% - 1px);
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+    }
+    .payer-trigger.is-open { border-color: var(--accent); }
+    .payer-trigger.is-placeholder { color: var(--text-3); }
+    .payer-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      z-index: 60;
+      max-height: 180px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 6px 0;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .payer-option {
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      text-align: left;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .payer-option:hover { background: var(--bg); }
+    .payer-option.is-active {
+      background: var(--bg);
+      font-weight: 500;
+    }
+    .owers-trigger {
+      width: 100%;
+      height: 33px;
+      padding: 7px 34px 7px 11px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background-color: var(--surface);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: border-color 0.15s;
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--text-3) 50%),
+        linear-gradient(135deg, var(--text-3) 50%, transparent 50%);
+      background-position:
+        calc(100% - 16px) calc(50% - 1px),
+        calc(100% - 11px) calc(50% - 1px);
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+    }
+    .owers-trigger.is-open { border-color: var(--accent); }
+    .owers-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      z-index: 60;
+      max-height: 180px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 6px 0;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .owers-option {
+      display: grid;
+      grid-template-columns: 13px 1fr;
+      align-items: center;
+      justify-content: start;
+      column-gap: 10px;
+      width: 100%;
+      font-size: 13px;
+      color: var(--text);
+      padding: 6px 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .owers-option:hover {
+      background: var(--bg);
+    }
+    .owers-option:has(input[type="checkbox"]:checked) {
+      background: var(--bg);
+    }
+    .owers-option input[type="checkbox"] {
+      width: 13px;
+      height: 13px;
+      margin: 0;
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid var(--border-strong);
+      border-radius: 3px;
+      background: var(--surface);
+      display: inline-grid;
+      place-content: center;
+      cursor: pointer;
+    }
+    .owers-option input[type="checkbox"]::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      transform: scale(0);
+      transition: transform 0.12s ease-in-out;
+      box-shadow: inset 1em 1em #fff;
+      clip-path: polygon(14% 44%, 0 60%, 45% 100%, 100% 18%, 82% 0, 43% 62%);
+    }
+    .owers-option input[type="checkbox"]:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .owers-option input[type="checkbox"]:checked::before {
+      transform: scale(1);
+    }
+    .owers-option input[type="checkbox"]:focus-visible {
+      outline: 2px solid var(--border-strong);
+      outline-offset: 1px;
+    }
+    .owers-option span {
+      text-align: left;
+    }
+    .owers-empty {
+      font-size: 12px;
+      color: var(--text-3);
+    }
 
     .btn {
       font-family: var(--sans);
@@ -333,6 +528,34 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
       transition: all 0.15s;
     }
     .header-download-btn:hover { background: var(--border); color: var(--text); }
+    .payments-pager {
+      display: grid;
+      grid-template-columns: auto 300px auto;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+    }
+    .payments-pager-info {
+      font-size: 12px;
+      color: var(--text-3);
+      text-align: center;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .payments-pager .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    @media (max-width: 640px) {
+      .payments-pager {
+        grid-template-columns: 1fr;
+      }
+      .payments-pager-info {
+        white-space: normal;
+      }
+    }
   </style>
 </head>
 <body x-data="app()" x-init="init()">
@@ -406,14 +629,100 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
           <button type="button" class="header-download-btn" @click="downloadPayments()">Download</button>
         </div>
       </div>
-      <div class="card">
+      <div class="card card-payments">
         <form class="add-form" @submit.prevent="createPayment()">
           <input x-model.number="newPayment.amount" type="number" step="0.01" min="0" placeholder="Amount" required>
-          <input x-model.trim="newPayment.payer" placeholder="Payer" required>
+          <div class="payer-dropdown" @click.outside="payerOpen = false">
+            <button
+              type="button"
+              class="payer-trigger"
+              :class="{ 'is-open': payerOpen, 'is-placeholder': !newPayment.payer }"
+              @click="payerOpen = !payerOpen"
+              x-text="newPayment.payer || 'Select Payer'"
+            ></button>
+            <div class="payer-menu" x-show="payerOpen" x-transition>
+              <template x-if="users.length === 0">
+                <span class="owers-empty">Add users to select payer</span>
+              </template>
+              <template x-for="u in users" :key="`payer-${u.ID}`">
+                <button
+                  type="button"
+                  class="payer-option"
+                  :class="{ 'is-active': newPayment.payer === u.Name }"
+                  @click="newPayment.payer = u.Name; newPayment.owers = newPayment.owers.filter((name) => name !== u.Name); payerOpen = false"
+                  x-text="u.Name"
+                ></button>
+              </template>
+            </div>
+          </div>
           <input x-model.trim="newPayment.description" class="input-wide" placeholder="Description" required>
-          <input x-model.trim="newPayment.owersRaw" class="input-wide" placeholder="Owers (comma-separated)">
+
+          <div class="owers-dropdown" @click.outside="owersOpen = false">
+            <button
+              type="button"
+              class="owers-trigger"
+              :class="{ 'is-open': owersOpen }"
+              @click="owersOpen = !owersOpen"
+              x-text="newPayment.owers.length ? `${newPayment.owers.length} ower${newPayment.owers.length > 1 ? 's' : ''} selected` : 'Select Owers'"
+            ></button>
+            <div class="owers-menu" x-show="owersOpen" x-transition>
+              <template x-if="users.filter((u) => u.Name !== newPayment.payer).length === 0">
+                <span class="owers-empty">Add users to select owers</span>
+              </template>
+              <template x-for="u in users.filter((u) => u.Name !== newPayment.payer)" :key="`ower-${u.ID}`">
+                <label class="owers-option">
+                  <input type="checkbox" x-model="newPayment.owers" :value="u.Name">
+                  <span x-text="u.Name"></span>
+                </label>
+              </template>
+            </div>
+          </div>
+
+          <div class="payer-dropdown" @click.outside="fromExchangeRateOpen = false">
+            <button
+              type="button"
+              class="payer-trigger"
+              :class="{ 'is-open': fromExchangeRateOpen, 'is-placeholder': !newPayment.fromExchangeRate }"
+              @click="fromExchangeRateOpen = !fromExchangeRateOpen"
+              x-text="newPayment.fromExchangeRate || 'From Currency'"
+            ></button>
+            <div class="payer-menu" x-show="fromExchangeRateOpen" x-transition>
+              <template x-for="e in exchangeRates" :key="`exchange-rate-${e}`">
+                <button
+                  type="button"
+                  class="payer-option"
+                  :class="{ 'is-active': newPayment.fromExchangeRate === e }"
+                  @click="newPayment.fromExchangeRate = e; fromExchangeRateOpen = false"
+                  x-text="e"
+                ></button>
+              </template>
+            </div>
+          </div>
+
+          <div class="payer-dropdown" @click.outside="toExchangeRateOpen = false">
+            <button
+              type="button"
+              class="payer-trigger"
+              :class="{ 'is-open': toExchangeRateOpen, 'is-placeholder': !newPayment.toExchangeRate }"
+              @click="toExchangeRateOpen = !toExchangeRateOpen"
+              x-text="newPayment.toExchangeRate || 'To Currency'"
+            ></button>
+            <div class="payer-menu" x-show="toExchangeRateOpen" x-transition>
+              <template x-for="e in exchangeRates" :key="`exchange-rate-${e}`">
+                <button
+                  type="button"
+                  class="payer-option"
+                  :class="{ 'is-active': newPayment.toExchangeRate === e }"
+                  @click="newPayment.toExchangeRate = e; toExchangeRateOpen = false"
+                  x-text="e"
+                ></button>
+              </template>
+            </div>
+          </div>
+
           <button type="submit" class="btn btn-primary">Add payment</button>
         </form>
+
         <div class="table-scroll">
           <table class="data-table">
             <thead>
@@ -421,14 +730,14 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
             </thead>
             <tbody>
               <template x-if="payments.length === 0">
-                <tr class="empty-row"><td colspan="6">No payments yet</td></tr>
+                <tr class="empty-row"><td colspan="7">No payments yet</td></tr>
               </template>
-              <template x-for="p in payments" :key="p.ID">
+              <template x-for="p in getPaymentsByPage(currentPaymentsPage)" :key="p.ID">
                 <tr>
                   <td class="cell-id" x-text="p.ID"></td>
                   <td class="cell-id" x-text="p.PayerName"></td>
                   <td class="cell-id" x-text="p.Owers"></td>
-                  <td class="cell-amount" x-text="p.Amount"></td>
+                  <td class="cell-amount" x-text="getFormattedAmount(p.Amount, p.FromExchangeRate)"></td>
                   <td x-text="p.Description"></td>
                   <td class="cell-date" x-text="p.Date"></td>
                   <td><button class="btn btn-danger" @click="deletePayment(p.ID)">Remove</button></td>
@@ -436,6 +745,27 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
               </template>
             </tbody>
           </table>
+        </div>
+
+        <div class="payments-pager" x-show="pageCount() > 1">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            @click="viewPaymentsPage(currentPaymentsPage - 1)"
+            :disabled="currentPaymentsPage === 0"
+          >Prev</button>
+          <div class="payments-pager-info">
+            Page <span x-text="currentPaymentsPage + 1"></span> of
+            <span x-text="pageCount()"></span> | Showing
+            <span x-text="startResults()"></span> to
+            <span x-text="endResults()"></span>
+          </div>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            @click="viewPaymentsPage(currentPaymentsPage + 1)"
+            :disabled="currentPaymentsPage >= pageCount() - 1"
+          >Next</button>
         </div>
       </div>
     </div>
@@ -538,15 +868,23 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
 
       return {
         users: [],
+        exchangeRates: ["USD", "EUR", "JPY"],
         payments: [],
         balances: [],
         balancesRaw: "[]",
         balancesView: "table",
+        payerOpen: false,
+        owersOpen: false,
+        fromExchangeRateOpen: false,
+        toExchangeRateOpen: false,
         newUserName: "",
-        newPayment: { amount: "", payer: "", description: "", owersRaw: "" },
+        newPayment: { amount: "", payer: "", description: "", fromExchangeRate: "", toExchangeRate: "", owers: [] },
         modal: { open: false, message: "", onConfirm: null },
         error: "",
         notice: "",
+        currentPaymentsPage: 0,
+        pageSize: 10,
+        paymentPagesData: [],
 
         async init() {
           await this.loadAll();
@@ -592,6 +930,47 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
           URL.revokeObjectURL(url);
         },
 
+        pageCount() {
+          return Math.max(1, this.paymentPagesData.length);
+        },
+
+        startResults() {
+          if (this.payments.length === 0) return 0;
+          return this.currentPaymentsPage * this.pageSize + 1;
+        },
+
+        endResults() {
+          if (this.payments.length === 0) return 0;
+          return Math.min((this.currentPaymentsPage + 1) * this.pageSize, this.payments.length);
+        },
+
+        viewPaymentsPage(pageNumber) {
+          const maxPage = Math.max(0, this.paymentPagesData.length - 1);
+          this.currentPaymentsPage = Math.min(Math.max(pageNumber, 0), maxPage);
+        },
+
+        getPaymentsByPage(pageNumber) {
+          return this.paymentPagesData[pageNumber] || [];
+        },
+
+        getFormattedAmount(amount, exchangeRate) {
+          const numericAmount = Number(amount);
+          if (!Number.isFinite(numericAmount)) return amount;
+
+          const currency = (exchangeRate || "").toUpperCase();
+          if (!currency) return numericAmount.toLocaleString();
+
+          try {
+            return new Intl.NumberFormat(undefined, {
+              style: "currency",
+              currency,
+              currencyDisplay: "symbol",
+            }).format(numericAmount);
+          } catch (_) {
+            return `${currency} ${numericAmount.toLocaleString()}`;
+          }
+        },
+
         downloadPayments() {
           const data = JSON.stringify(this.payments, null, 2);
           const blob = new Blob([data], { type: "application/json" });
@@ -623,7 +1002,12 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
               reqWithRaw("/api/v1/balance/all")
             ]);
             this.users    = Array.isArray(users)    ? users    : [];
+
             this.payments = Array.isArray(payments) ? payments : [];
+            
+            // update payment pagination
+            await this.updatePaymentPagination(this.payments);
+
             this.balances = Array.isArray(balancesResp.data) ? balancesResp.data : [];
             this.balancesRaw = balancesResp.raw;
             if (this.balancesView === "code") this.highlightBalances();
@@ -631,6 +1015,15 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
           } catch (e) {
             this.flashError(`Load failed: ${e.message}`);
           }
+        },
+
+        async updatePaymentPagination(payments) {
+          this.paymentPagesData = [];
+          for (let i = 0; i < payments.length; i += this.pageSize) {
+            this.paymentPagesData.push(payments.slice(i, i + this.pageSize));
+          }
+          const maxPage = Math.max(0, this.paymentPagesData.length - 1);
+          if (this.currentPaymentsPage > maxPage) this.currentPaymentsPage = maxPage;
         },
 
         async createUser() {
@@ -664,10 +1057,13 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
 
         async createPayment() {
           this.flashError("");
-          const owers = this.newPayment.owersRaw
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
+          if (!this.newPayment.payer) {
+            this.flashError("Please select a payer");
+            return;
+          }
+          const owers = Array.isArray(this.newPayment.owers)
+            ? [...new Set(this.newPayment.owers.filter((name) => Boolean(name) && name !== this.newPayment.payer))]
+            : [];
           try {
             await req("/api/v1/payment", {
               method: "POST",
@@ -675,10 +1071,16 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
                 amount:      Number(this.newPayment.amount),
                 payer:       this.newPayment.payer,
                 description: this.newPayment.description,
+                fromExchangeRate: this.newPayment.fromExchangeRate,
+                toExchangeRate: this.newPayment.toExchangeRate,
                 owers,
               }),
             });
-            this.newPayment = { amount: "", payer: "", description: "", owersRaw: "" };
+            this.newPayment = { amount: "", payer: "", description: "", fromExchangeRate: "", toExchangeRate: "", owers: [] };
+            this.payerOpen = false;
+            this.owersOpen = false;
+            this.fromExchangeRateOpen = false;
+            this.toExchangeRateOpen = false;
             this.flashNotice("Payment created");
             await this.loadAll();
           } catch (e) {
