@@ -403,6 +403,13 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
     .cell-id { font-family: var(--mono); font-size: 11px; color: var(--text-3); }
     .cell-date { font-size: 12px; color: var(--text-3); }
     .cell-amount { font-family: var(--mono); font-weight: 500; font-size: 13px; }
+    .amount-header { text-align: center !important; }
+    .payment-amount-cell { text-align: center; white-space: nowrap; }
+    .payment-amount-group {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
     .empty-row td { text-align: center; color: var(--text-3); padding: 32px 16px; font-size: 13px; }
 
     .balance-from { font-weight: 500; }
@@ -726,7 +733,7 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
         <div class="table-scroll">
           <table class="data-table">
             <thead>
-              <tr><th>ID</th><th>Payer</th><th>Owers</th><th>Amount</th><th>Description</th><th>Date</th><th></th></tr>
+              <tr><th>ID</th><th>Payer</th><th>Owers</th><th class="amount-header">Amount</th><th>Description</th><th>Date</th><th></th></tr>
             </thead>
             <tbody>
               <template x-if="payments.length === 0">
@@ -737,7 +744,18 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
                   <td class="cell-id" x-text="p.ID"></td>
                   <td class="cell-id" x-text="p.PayerName"></td>
                   <td class="cell-id" x-text="p.Owers"></td>
-                  <td class="cell-amount" x-text="getFormattedAmount(p.Amount, p.FromExchangeRate)"></td>
+                  <td class="payment-amount-cell">
+                    <template x-if="isCrossCurrencyPayment(p)">
+                      <span class="payment-amount-group">
+                        <span class="cell-amount" x-text="getFormattedAmount(p.Amount, p.FromExchangeRate)"></span>
+                        <span class="balance-arrow">→</span>
+                        <span class="cell-amount" x-text="getFormattedAmount(Number(p.Amount) * Number(p.ExchangeRate), p.ToExchangeRate)"></span>
+                      </span>
+                    </template>
+                    <template x-if="!isCrossCurrencyPayment(p)">
+                      <span class="cell-amount" x-text="getFormattedAmount(p.Amount, p.FromExchangeRate)"></span>
+                    </template>
+                  </td>
                   <td x-text="p.Description"></td>
                   <td class="cell-date" x-text="p.Date"></td>
                   <td><button class="btn btn-danger" @click="deletePayment(p.ID)">Remove</button></td>
@@ -969,6 +987,14 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
           } catch (_) {
             return `${currency} ${numericAmount.toLocaleString()}`;
           }
+        },
+
+        isCrossCurrencyPayment(payment) {
+          if (!payment) return false;
+          const from = (payment.FromExchangeRate || "").toUpperCase();
+          const to = (payment.ToExchangeRate || "").toUpperCase();
+          const rate = Number(payment.ExchangeRate);
+          return Boolean(from && to && from !== to && Number.isFinite(rate));
         },
 
         downloadPayments() {
