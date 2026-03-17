@@ -410,6 +410,19 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
       align-items: center;
       justify-content: center;
     }
+    .amount-btn {
+      background: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+      cursor: pointer;
+      color: inherit;
+      font: inherit;
+    }
+    .amount-btn:hover .cell-amount {
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
     .empty-row td { text-align: center; color: var(--text-3); padding: 32px 16px; font-size: 13px; }
 
     .balance-from { font-weight: 500; }
@@ -745,15 +758,26 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
                   <td class="cell-id" x-text="p.PayerName"></td>
                   <td class="cell-id" x-text="p.Owers"></td>
                   <td class="payment-amount-cell">
-                    <template x-if="isCrossCurrencyPayment(p)">
-                      <span class="payment-amount-group">
-                        <span class="cell-amount" x-text="getFormattedAmount(p.Amount, p.FromExchangeRate)"></span>
-                        <span class="balance-arrow">→</span>
-                        <span class="cell-amount" x-text="getFormattedAmount(Number(p.Amount) * Number(p.ExchangeRate), p.ToExchangeRate)"></span>
-                      </span>
+                    <template x-if="!isShowingPaymentRate(p.ID)">
+                      <button type="button" class="amount-btn payment-amount-group" @click="togglePaymentAmountView(p.ID)">
+                        <template x-if="isCrossCurrencyPayment(p)">
+                          <span class="payment-amount-group">
+                            <span class="cell-amount" x-text="getFormattedAmount(p.Amount, p.FromExchangeRate)"></span>
+                            <span class="balance-arrow">→</span>
+                            <span class="cell-amount" x-text="getFormattedAmount(Number(p.Amount) * Number(p.ExchangeRate), p.ToExchangeRate)"></span>
+                          </span>
+                        </template>
+                        <template x-if="!isCrossCurrencyPayment(p)">
+                          <span class="cell-amount" x-text="getFormattedAmount(p.Amount, p.FromExchangeRate)"></span>
+                        </template>
+                      </button>
                     </template>
-                    <template x-if="!isCrossCurrencyPayment(p)">
-                      <span class="cell-amount" x-text="getFormattedAmount(p.Amount, p.FromExchangeRate)"></span>
+                    <template x-if="isShowingPaymentRate(p.ID)">
+                      <button type="button" class="amount-btn payment-amount-group" @click="togglePaymentAmountView(p.ID)">
+                        <span class="cell-amount" x-text="getPaymentRateFromDisplay(p)"></span>
+                        <span class="balance-arrow">→</span>
+                        <span class="cell-amount" x-text="getPaymentRateToDisplay(p)"></span>
+                      </button>
                     </template>
                   </td>
                   <td x-text="p.Description"></td>
@@ -903,6 +927,7 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
         currentPaymentsPage: 0,
         pageSize: 10,
         paymentPagesData: [],
+        activePaymentRateId: null,
 
         async init() {
           await this.loadAll();
@@ -995,6 +1020,30 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
           const to = (payment.ToExchangeRate || "").toUpperCase();
           const rate = Number(payment.ExchangeRate);
           return Boolean(from && to && from !== to && Number.isFinite(rate));
+        },
+
+        togglePaymentAmountView(paymentId) {
+          if (!paymentId) return;
+          this.activePaymentRateId = this.activePaymentRateId === paymentId ? null : paymentId;
+        },
+
+        isShowingPaymentRate(paymentId) {
+          return this.activePaymentRateId === paymentId;
+        },
+
+        getPaymentRateFromDisplay(payment) {
+          if (!payment) return "";
+          const from = (payment.FromExchangeRate || "").toUpperCase();
+          if (!from) return "No exchange-rate data";
+          return `1 ${from}`;
+        },
+
+        getPaymentRateToDisplay(payment) {
+          if (!payment) return "";
+          const to = (payment.ToExchangeRate || "").toUpperCase();
+          const rate = Number(payment.ExchangeRate);
+          if (!to || !Number.isFinite(rate)) return "No exchange-rate data";
+          return `${rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${to}`;
         },
 
         downloadPayments() {
