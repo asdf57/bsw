@@ -74,17 +74,6 @@ func (ctrl *Controller) resolveUserIdFromName(name string) (*uint, error) {
 	return &dbEntry.ID, nil
 }
 
-func (ctrl *Controller) getUsers() ([]models.UserDBEntry, error) {
-	var users []models.UserDBEntry
-
-	if err := ctrl.db.Find(&users).Error; err != nil {
-		log.Printf("db error while fetching users: %v", err)
-		return nil, err
-	}
-
-	return users, nil
-}
-
 func (ctrl *Controller) resolveUserNameFromId(id uint) (*string, error) {
 	var dbEntry models.UserDBEntry
 
@@ -113,6 +102,32 @@ func (ctrl *Controller) commitBalanceUpdates(dbEntries []models.BalanceDBEntry) 
 			tx.Rollback()
 		}
 	}()
+
+	var existingBalances []models.BalanceDBEntry
+	if err := tx.Find(&existingBalances).Error; err != nil {
+		log.Printf("failed to fetch existing balances: %v", err)
+		tx.Rollback()
+		return err
+	}
+
+	for _, existingEntry := range existingBalances {
+		found := false
+		for _, desiredEntry := range dbEntries {
+			if existingEntry.FromUserID == desiredEntry.FromUserID && existingEntry.ToUserID == desiredEntry.ToUserID {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			log.Printf("Deleting balance entry from DB: from user id %d to user id %d: $%.2f\n", existingEntry.FromUserID, existingEntry.ToUserID, existingEntry.Amount)
+			if err := tx.Unscoped().Delete(&existingEntry).Error; err != nil {
+				log.Printf("failed to delete balance entry: %v", err)
+				tx.Rollback()
+				return err
+			}
+		}
+	}
 
 	for _, entry := range dbEntries {
 		log.Printf("Commiting balance update to DB: from user id %d to user id %d: $%.2f\n", entry.FromUserID, entry.ToUserID, entry.Amount)
@@ -523,11 +538,10 @@ func (ctrl *Controller) UpdateBalances(c *gin.Context) {
 		for _, ower := range owers {
 			log.Printf("Adding payment %d: %s owes %s $%.2f\n", paymentDbEntry.ID, ower.Name, paymentDbEntry.PayerName, amountPerOwer)
 			raw[debtKey{From: ower.ID, To: payerId}] += amountPerOwer
-
-			// Let's take this opportunity to also add an entry for the inverse if not already defined
-			if _, ok := raw[debtKey{From: payerId, To: ower.ID}]; !ok {
-				raw[debtKey{From: payerId, To: ower.ID}] = 0.0
-			}
+			// // Let's take this opportunity to also add an entry for the inverse if not already defined
+			// if _, ok := raw[debtKey{From: payerId, To: ower.ID}]; !ok {
+			// 	raw[debtKey{From: payerId, To: ower.ID}] = 0.0
+			// }
 		}
 	}
 
@@ -546,7 +560,9 @@ func (ctrl *Controller) UpdateBalances(c *gin.Context) {
 
 		if amount >= inverseDebt {
 			raw[debtEntry] = amount - inverseDebt
-			raw[debtKey{From: toUser, To: fromUser}] = 0.0
+
+			// Remove the inverse debt since it's now accounted for rather than zeroing it
+			delete(raw, debtKey{From: toUser, To: fromUser})
 		}
 	}
 
@@ -609,7 +625,7 @@ func (ctrl *Controller) UpdateBalances(c *gin.Context) {
 func (ctrl *Controller) GetBalances(c *gin.Context) {
 	var dbResults []models.BalanceDBEntry
 	var results []models.Balance
-	if err := ctrl.db.Find(&dbResults).Error; err != nil {
+	if err := ctrl.db.Order("from_user_id ASC").Order("to_user_id ASC").Order("id ASC").Find(&dbResults).Error; err != nil {
 		log.Printf("db error while fetching debts: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while fetching debts"})
 		return
