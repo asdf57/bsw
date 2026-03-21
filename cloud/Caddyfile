@@ -1,0 +1,8 @@
+{$DOMAIN} {
+    tls {
+        dns cloudflare {$CF_API_TOKEN}
+    }
+
+    encode zstd gzip
+    reverse_proxy frontend:80
+}
