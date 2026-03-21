@@ -1,4 +1,4 @@
-.PHONY: build build-frontend connect-db clean cloud-up cloud-down
+.PHONY: build build-frontend connect-db clean
 
 build:
 	go run github.com/swaggo/swag/cmd/swag@latest init
@@ -12,9 +12,3 @@ connect-db:
 
 clean:
 	docker compose down -v
-
-cloud-up:
-	docker compose --env-file cloud/.env -f cloud/docker-compose.yml up -d --build
-
-cloud-down:
-	docker compose --env-file cloud/.env -f cloud/docker-compose.yml down -v
