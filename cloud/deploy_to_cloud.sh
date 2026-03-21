@@ -20,18 +20,23 @@ if [[ -z "${CF_API_TOKEN:-}" ]]; then
 fi
 
 echo "[1/5] Installing Docker..."
-apt-get update -qq
-apt-get install -y -qq ca-certificates curl gnupg git ufw
-install -m 0755 -d /etc/apt/keyrings
-if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-fi
-chmod a+r /etc/apt/keyrings/docker.gpg
-if [[ ! -f /etc/apt/sources.list.d/docker.list ]]; then
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${VERSION_CODENAME}") stable" > /etc/apt/sources.list.d/docker.list
-fi
-apt-get update -qq
-apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo apt update
+sudo apt install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/debian
+Suites: $(. /etc/os-release && echo "$VERSION_CODENAME")
+Components: stable
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt update
+
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 if [[ ! -f "${APP_DIR}/docker-compose.yml" || ! -f "${APP_DIR}/cloud/docker-compose.yml" ]]; then
   echo "Could not find repo files from ${APP_DIR}." >&2
