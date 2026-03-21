@@ -110,6 +110,7 @@ func (ctrl *Controller) commitBalanceUpdates(dbEntries []models.BalanceDBEntry) 
 		return err
 	}
 
+	// Delete the balances that are no longer relevant
 	for _, existingEntry := range existingBalances {
 		found := false
 		for _, desiredEntry := range dbEntries {
@@ -514,10 +515,10 @@ func (ctrl *Controller) GetUsers(c *gin.Context) {
 // @Summary Update all balances
 // @Router /api/v1/balance/all [post]
 func (ctrl *Controller) UpdateBalances(c *gin.Context) {
-	// to do this, we need to go through all the payments and calculate how much each user owes to each other user, then update the balances table accordingly
 	type debtKey struct {
-		From uint
-		To   uint
+		From     uint
+		To       uint
+		Currency string
 	}
 
 	var payments []models.PaymentDBEntry
@@ -536,12 +537,8 @@ func (ctrl *Controller) UpdateBalances(c *gin.Context) {
 		amountPerOwer := paymentDbEntry.Amount / float64(len(owers))
 
 		for _, ower := range owers {
-			log.Printf("Adding payment %d: %s owes %s $%.2f\n", paymentDbEntry.ID, ower.Name, paymentDbEntry.PayerName, amountPerOwer)
-			raw[debtKey{From: ower.ID, To: payerId}] += amountPerOwer
-			// // Let's take this opportunity to also add an entry for the inverse if not already defined
-			// if _, ok := raw[debtKey{From: payerId, To: ower.ID}]; !ok {
-			// 	raw[debtKey{From: payerId, To: ower.ID}] = 0.0
-			// }
+			log.Printf("Adding payment %d: %s owes %s $%.2f in currency %s\n", paymentDbEntry.ID, ower.Name, paymentDbEntry.PayerName, amountPerOwer, paymentDbEntry.FromExchangeRate)
+			raw[debtKey{From: ower.ID, To: payerId, Currency: paymentDbEntry.FromExchangeRate}] += amountPerOwer
 		}
 	}
 
@@ -554,7 +551,7 @@ func (ctrl *Controller) UpdateBalances(c *gin.Context) {
 		fromUser := debtEntry.From // person A
 		toUser := debtEntry.To     // person B
 
-		inverseDebt := raw[debtKey{From: toUser, To: fromUser}]
+		inverseDebt := raw[debtKey{From: toUser, To: fromUser, Currency: debtEntry.Currency}]
 
 		log.Printf("Discovered inverse debt: %d owes %d: $%.2f\n", toUser, fromUser, inverseDebt)
 
@@ -562,7 +559,7 @@ func (ctrl *Controller) UpdateBalances(c *gin.Context) {
 			raw[debtEntry] = amount - inverseDebt
 
 			// Remove the inverse debt since it's now accounted for rather than zeroing it
-			delete(raw, debtKey{From: toUser, To: fromUser})
+			delete(raw, debtKey{From: toUser, To: fromUser, Currency: debtEntry.Currency})
 		}
 	}
 
@@ -596,12 +593,14 @@ func (ctrl *Controller) UpdateBalances(c *gin.Context) {
 			FromUser: *fromUserName,
 			ToUser:   *toUserName,
 			Amount:   amount,
+			Currency: debtEntry.Currency,
 		})
 
 		dbEntries = append(dbEntries, models.BalanceDBEntry{
 			FromUserID: debtEntry.From,
 			ToUserID:   debtEntry.To,
 			Amount:     amount,
+			Currency:   debtEntry.Currency,
 		})
 
 		log.Printf("Balance: %s owes %s: $%.2f\n", *fromUserName, *toUserName, amount)
@@ -623,6 +622,7 @@ func (ctrl *Controller) UpdateBalances(c *gin.Context) {
 // @Summary Get all balances
 // @Router /api/v1/balance/all [get]
 func (ctrl *Controller) GetBalances(c *gin.Context) {
+	var users []models.UserDBEntry
 	var dbResults []models.BalanceDBEntry
 	var results []models.Balance
 	if err := ctrl.db.Order("from_user_id ASC").Order("to_user_id ASC").Order("id ASC").Find(&dbResults).Error; err != nil {
@@ -633,27 +633,58 @@ func (ctrl *Controller) GetBalances(c *gin.Context) {
 
 	log.Printf("I found these balances: %+v", dbResults)
 
-	for _, entry := range dbResults {
-		var err error
-		var fromUser, toUser *string
-
-		if fromUser, err = ctrl.resolveUserNameFromId(entry.FromUserID); err != nil {
-			log.Printf("db error while fetching from user: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while from user"})
+	if err := ctrl.db.Find(&users).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no users found"})
 			return
 		}
 
-		if toUser, err = ctrl.resolveUserNameFromId(entry.ToUserID); err != nil {
-			log.Printf("db error while fetching to user: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while to user"})
-			return
-		}
-		results = append(results, models.Balance{
-			FromUser: *fromUser,
-			ToUser:   *toUser,
-			Amount:   entry.Amount,
-		})
+		log.Printf("db error while fetching users: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while fetching users"})
+		return
 	}
+
+	for _, user := range users {
+		for _, entry := range dbResults {
+			var err error
+			var fromUser, toUser *string
+
+			if fromUser, err = ctrl.resolveUserNameFromId(entry.FromUserID); err != nil {
+				log.Printf("db error while fetching from user: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while from user"})
+				return
+			}
+
+			if *fromUser != user.Name {
+				continue
+			}
+
+			if toUser, err = ctrl.resolveUserNameFromId(entry.ToUserID); err != nil {
+				log.Printf("db error while fetching to user: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while to user"})
+				return
+			}
+			results = append(results, models.Balance{
+				FromUser: *fromUser,
+				ToUser:   *toUser,
+				Amount:   entry.Amount,
+				Currency: entry.Currency,
+			})
+		}
+	}
+
+	/*
+		Want to return something like :
+		{
+			"alice": {
+				"bob": {
+					"USD": 20,
+					"YEN": 3000,
+				}
+			}
+		}
+
+	*/
 
 	c.JSON(http.StatusOK, results)
 }

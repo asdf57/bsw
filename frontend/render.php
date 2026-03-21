@@ -390,6 +390,39 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
       background: var(--bg);
       border-bottom: 1px solid var(--border);
     }
+    .data-table th.sortable {
+      cursor: pointer;
+      position: relative;
+      user-select: none;
+      padding-right: 18px;
+    }
+    .sort-indicator {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 10px;
+      color: var(--text-3);
+      text-transform: none;
+    }
+    .col-resize-handle {
+      position: absolute;
+      top: 0;
+      right: -4px;
+      width: 8px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 2;
+    }
+    .col-resize-handle::after {
+      content: "";
+      position: absolute;
+      right: 3px;
+      top: 20%;
+      bottom: 20%;
+      width: 1px;
+      background: var(--border);
+    }
     .data-table td {
       padding: 11px 16px;
       border-bottom: 1px solid var(--border);
@@ -548,7 +581,7 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
       transition: all 0.15s;
     }
     .header-download-btn:hover { background: var(--border); color: var(--text); }
-    .payments-pager {
+    .table-pager {
       display: grid;
       grid-template-columns: auto 300px auto;
       align-items: center;
@@ -557,22 +590,22 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
       padding: 10px 16px;
       border-top: 1px solid var(--border);
     }
-    .payments-pager-info {
+    .table-pager-info {
       font-size: 12px;
       color: var(--text-3);
       text-align: center;
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
     }
-    .payments-pager .btn:disabled {
+    .table-pager .btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
     @media (max-width: 640px) {
-      .payments-pager {
+      .table-pager {
         grid-template-columns: 1fr;
       }
-      .payments-pager-info {
+      .table-pager-info {
         white-space: normal;
       }
     }
@@ -621,14 +654,25 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
           <button type="submit" class="btn btn-primary">Add user</button>
         </form>
         <table class="data-table">
+          <colgroup>
+            <col :style="`width:${tableUi.users.widths.id}px`">
+            <col :style="`width:${tableUi.users.widths.name}px`">
+            <col :style="`width:${tableUi.users.widths.created}px`">
+            <col :style="`width:${tableUi.users.widths.actions}px`">
+          </colgroup>
           <thead>
-            <tr><th>ID</th><th>Name</th><th>Created</th><th></th></tr>
+            <tr>
+              <th class="sortable" @click="toggleTableSort('users', 'ID')">ID <span class="sort-indicator" x-text="tableSortIndicator('users', 'ID')"></span><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('users', 'id', $event)"></span></th>
+              <th class="sortable" @click="toggleTableSort('users', 'Name')">Name <span class="sort-indicator" x-text="tableSortIndicator('users', 'Name')"></span><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('users', 'name', $event)"></span></th>
+              <th class="sortable" @click="toggleTableSort('users', 'CreatedAt')">Created <span class="sort-indicator" x-text="tableSortIndicator('users', 'CreatedAt')"></span><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('users', 'created', $event)"></span></th>
+              <th><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('users', 'actions', $event)"></span></th>
+            </tr>
           </thead>
           <tbody>
             <template x-if="users.length === 0">
               <tr class="empty-row"><td colspan="4">No users yet</td></tr>
             </template>
-            <template x-for="u in users" :key="u.ID">
+            <template x-for="u in getTablePageRows('users', users)" :key="u.ID">
               <tr>
                 <td class="cell-id" x-text="u.ID"></td>
                 <td x-text="u.Name"></td>
@@ -638,6 +682,26 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
             </template>
           </tbody>
         </table>
+        <div class="table-pager" x-show="getTablePageCount('users', users.length) > 1">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            @click="viewTablePage('users', tableUi.users.page - 1, users.length)"
+            :disabled="tableUi.users.page === 0"
+          >Prev</button>
+          <div class="table-pager-info">
+            Page <span x-text="tableUi.users.page + 1"></span> of
+            <span x-text="getTablePageCount('users', users.length)"></span> | Showing
+            <span x-text="getTablePageStart('users', users.length)"></span> to
+            <span x-text="getTablePageEnd('users', users.length)"></span>
+          </div>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            @click="viewTablePage('users', tableUi.users.page + 1, users.length)"
+            :disabled="tableUi.users.page >= getTablePageCount('users', users.length) - 1"
+          >Next</button>
+        </div>
       </div>
     </div>
 
@@ -745,14 +809,31 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
 
         <div class="table-scroll">
           <table class="data-table">
+            <colgroup>
+              <col :style="`width:${tableUi.payments.widths.id}px`">
+              <col :style="`width:${tableUi.payments.widths.payer}px`">
+              <col :style="`width:${tableUi.payments.widths.owers}px`">
+              <col :style="`width:${tableUi.payments.widths.amount}px`">
+              <col :style="`width:${tableUi.payments.widths.description}px`">
+              <col :style="`width:${tableUi.payments.widths.date}px`">
+              <col :style="`width:${tableUi.payments.widths.actions}px`">
+            </colgroup>
             <thead>
-              <tr><th>ID</th><th>Payer</th><th>Owers</th><th class="amount-header">Amount</th><th>Description</th><th>Date</th><th></th></tr>
+              <tr>
+                <th class="sortable" @click="toggleTableSort('payments', 'ID')">ID <span class="sort-indicator" x-text="tableSortIndicator('payments', 'ID')"></span><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('payments', 'id', $event)"></span></th>
+                <th class="sortable" @click="toggleTableSort('payments', 'PayerName')">Payer <span class="sort-indicator" x-text="tableSortIndicator('payments', 'PayerName')"></span><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('payments', 'payer', $event)"></span></th>
+                <th class="sortable" @click="toggleTableSort('payments', 'Owers')">Owers <span class="sort-indicator" x-text="tableSortIndicator('payments', 'Owers')"></span><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('payments', 'owers', $event)"></span></th>
+                <th class="amount-header sortable" @click="toggleTableSort('payments', 'Amount')">Amount <span class="sort-indicator" x-text="tableSortIndicator('payments', 'Amount')"></span><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('payments', 'amount', $event)"></span></th>
+                <th class="sortable" @click="toggleTableSort('payments', 'Description')">Description <span class="sort-indicator" x-text="tableSortIndicator('payments', 'Description')"></span><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('payments', 'description', $event)"></span></th>
+                <th class="sortable" @click="toggleTableSort('payments', 'Date')">Date <span class="sort-indicator" x-text="tableSortIndicator('payments', 'Date')"></span><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('payments', 'date', $event)"></span></th>
+                <th><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('payments', 'actions', $event)"></span></th>
+              </tr>
             </thead>
             <tbody>
               <template x-if="payments.length === 0">
                 <tr class="empty-row"><td colspan="7">No payments yet</td></tr>
               </template>
-              <template x-for="p in getPaymentsByPage(currentPaymentsPage)" :key="p.ID">
+              <template x-for="p in getTablePageRows('payments', payments)" :key="p.ID">
                 <tr>
                   <td class="cell-id" x-text="p.ID"></td>
                   <td class="cell-id" x-text="p.PayerName"></td>
@@ -789,24 +870,24 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
           </table>
         </div>
 
-        <div class="payments-pager" x-show="pageCount() > 1">
+        <div class="table-pager" x-show="getTablePageCount('payments', payments.length) > 1">
           <button
             type="button"
             class="btn btn-ghost"
-            @click="viewPaymentsPage(currentPaymentsPage - 1)"
-            :disabled="currentPaymentsPage === 0"
+            @click="viewTablePage('payments', tableUi.payments.page - 1, payments.length)"
+            :disabled="tableUi.payments.page === 0"
           >Prev</button>
-          <div class="payments-pager-info">
-            Page <span x-text="currentPaymentsPage + 1"></span> of
-            <span x-text="pageCount()"></span> | Showing
-            <span x-text="startResults()"></span> to
-            <span x-text="endResults()"></span>
+          <div class="table-pager-info">
+            Page <span x-text="tableUi.payments.page + 1"></span> of
+            <span x-text="getTablePageCount('payments', payments.length)"></span> | Showing
+            <span x-text="getTablePageStart('payments', payments.length)"></span> to
+            <span x-text="getTablePageEnd('payments', payments.length)"></span>
           </div>
           <button
             type="button"
             class="btn btn-ghost"
-            @click="viewPaymentsPage(currentPaymentsPage + 1)"
-            :disabled="currentPaymentsPage >= pageCount() - 1"
+            @click="viewTablePage('payments', tableUi.payments.page + 1, payments.length)"
+            :disabled="tableUi.payments.page >= getTablePageCount('payments', payments.length) - 1"
           >Next</button>
         </div>
       </div>
@@ -841,25 +922,52 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
       <div class="card">
         <template x-if="balancesView === 'table'">
           <table class="data-table">
+            <colgroup>
+              <col :style="`width:${tableUi.balances.widths.who}px`">
+              <col :style="`width:${tableUi.balances.widths.amount}px`">
+            </colgroup>
             <thead>
-              <tr><th>Who owes whom</th><th>Amount</th></tr>
+              <tr>
+                <th class="sortable" @click="toggleTableSort('balances', 'FromUser')">Who owes whom <span class="sort-indicator" x-text="tableSortIndicator('balances', 'FromUser')"></span><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('balances', 'who', $event)"></span></th>
+                <th class="sortable" @click="toggleTableSort('balances', 'Amount')">Amount <span class="sort-indicator" x-text="tableSortIndicator('balances', 'Amount')"></span><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('balances', 'amount', $event)"></span></th>
+              </tr>
             </thead>
             <tbody>
               <template x-if="balances.length === 0">
                 <tr class="empty-row"><td colspan="2">All settled up</td></tr>
               </template>
-              <template x-for="b in balances" :key="`${b.FromUser}-${b.ToUser}`">
+              <template x-for="b in getTablePageRows('balances', balances)" :key="`${b.FromUser}-${b.ToUser}-${b.Currency || ''}`">
                 <tr>
                   <td>
                     <span class="balance-from" x-text="b.FromUser"></span>
                     <span class="balance-arrow">→</span>
                     <span class="balance-to" x-text="b.ToUser"></span>
                   </td>
-                  <td><span class="balance-amount" x-text="b.Amount"></span></td>
+                  <td><span class="balance-amount" x-text="getBalanceAmountDisplay(b)"></span></td>
                 </tr>
               </template>
             </tbody>
           </table>
+          <div class="table-pager" x-show="getTablePageCount('balances', balances.length) > 1">
+            <button
+              type="button"
+              class="btn btn-ghost"
+              @click="viewTablePage('balances', tableUi.balances.page - 1, balances.length)"
+              :disabled="tableUi.balances.page === 0"
+            >Prev</button>
+            <div class="table-pager-info">
+              Page <span x-text="tableUi.balances.page + 1"></span> of
+              <span x-text="getTablePageCount('balances', balances.length)"></span> | Showing
+              <span x-text="getTablePageStart('balances', balances.length)"></span> to
+              <span x-text="getTablePageEnd('balances', balances.length)"></span>
+            </div>
+            <button
+              type="button"
+              class="btn btn-ghost"
+              @click="viewTablePage('balances', tableUi.balances.page + 1, balances.length)"
+              :disabled="tableUi.balances.page >= getTablePageCount('balances', balances.length) - 1"
+            >Next</button>
+          </div>
         </template>
         <template x-if="balancesView === 'code'">
           <div class="code-panel">
@@ -924,10 +1032,28 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
         modal: { open: false, message: "", onConfirm: null },
         error: "",
         notice: "",
-        currentPaymentsPage: 0,
-        pageSize: 10,
-        paymentPagesData: [],
         activePaymentRateId: null,
+        tableUi: {
+          users: {
+            page: 0,
+            size: 10,
+            sort: { key: "CreatedAt", dir: "desc" },
+            widths: { id: 72, name: 180, created: 220, actions: 96 },
+          },
+          payments: {
+            page: 0,
+            size: 10,
+            sort: { key: "Date", dir: "desc" },
+            widths: { id: 64, payer: 110, owers: 140, amount: 210, description: 220, date: 176, actions: 96 },
+          },
+          balances: {
+            page: 0,
+            size: 10,
+            sort: { key: "FromUser", dir: "asc" },
+            widths: { who: 360, amount: 140 },
+          },
+        },
+        resizeSensitivity: 1.35,
 
         async init() {
           await this.loadAll();
@@ -973,27 +1099,117 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
           URL.revokeObjectURL(url);
         },
 
-        pageCount() {
-          return Math.max(1, this.paymentPagesData.length);
+        getTablePageCount(tableName, totalCount) {
+          const state = this.tableUi[tableName];
+          if (!state) return 1;
+          return Math.max(1, Math.ceil(totalCount / state.size));
         },
 
-        startResults() {
-          if (this.payments.length === 0) return 0;
-          return this.currentPaymentsPage * this.pageSize + 1;
+        getTablePageStart(tableName, totalCount) {
+          const state = this.tableUi[tableName];
+          if (!state || totalCount === 0) return 0;
+          return state.page * state.size + 1;
         },
 
-        endResults() {
-          if (this.payments.length === 0) return 0;
-          return Math.min((this.currentPaymentsPage + 1) * this.pageSize, this.payments.length);
+        getTablePageEnd(tableName, totalCount) {
+          const state = this.tableUi[tableName];
+          if (!state || totalCount === 0) return 0;
+          return Math.min((state.page + 1) * state.size, totalCount);
         },
 
-        viewPaymentsPage(pageNumber) {
-          const maxPage = Math.max(0, this.paymentPagesData.length - 1);
-          this.currentPaymentsPage = Math.min(Math.max(pageNumber, 0), maxPage);
+        viewTablePage(tableName, pageNumber, totalCount) {
+          const state = this.tableUi[tableName];
+          if (!state) return;
+          const maxPage = Math.max(0, this.getTablePageCount(tableName, totalCount) - 1);
+          state.page = Math.min(Math.max(pageNumber, 0), maxPage);
         },
 
-        getPaymentsByPage(pageNumber) {
-          return this.paymentPagesData[pageNumber] || [];
+        sortValue(tableName, row, key) {
+          if (tableName === "payments" && key === "Owers") {
+            const owers = row?.Owers;
+            return Array.isArray(owers) ? owers.join(", ") : String(owers || "");
+          }
+          return row?.[key];
+        },
+
+        getSortedRows(tableName, rows) {
+          const state = this.tableUi[tableName];
+          if (!state) return rows;
+          const arr = [...rows];
+          const { key, dir } = state.sort;
+          const direction = dir === "asc" ? 1 : -1;
+          return arr.sort((a, b) => {
+            const av = this.sortValue(tableName, a, key);
+            const bv = this.sortValue(tableName, b, key);
+            if (key === "Amount" || key === "ID") {
+              return (Number(av) - Number(bv)) * direction;
+            }
+            if (key === "Date" || key === "CreatedAt") {
+              return (new Date(av || 0).getTime() - new Date(bv || 0).getTime()) * direction;
+            }
+            return String(av || "").localeCompare(String(bv || "")) * direction;
+          });
+        },
+
+        getTablePageRows(tableName, rows) {
+          const state = this.tableUi[tableName];
+          if (!state) return rows;
+          const sorted = this.getSortedRows(tableName, rows);
+          const start = state.page * state.size;
+          return sorted.slice(start, start + state.size);
+        },
+
+        toggleTableSort(tableName, key) {
+          const state = this.tableUi[tableName];
+          if (!state) return;
+          if (state.sort.key === key) {
+            state.sort.dir = state.sort.dir === "asc" ? "desc" : "asc";
+          } else {
+            state.sort.key = key;
+            state.sort.dir = (key === "Date" || key === "CreatedAt") ? "desc" : "asc";
+          }
+          state.page = 0;
+        },
+
+        tableSortIndicator(tableName, key) {
+          const state = this.tableUi[tableName];
+          if (!state || state.sort.key !== key) return "";
+          return state.sort.dir === "asc" ? "↑" : "↓";
+        },
+
+        startColumnResize(tableName, widthKey, event) {
+          const state = this.tableUi[tableName];
+          if (!state || !state.widths || state.widths[widthKey] == null) return;
+          const startX = event.clientX;
+          const startWidth = state.widths[widthKey];
+          const minWidth = widthKey === "actions" ? 72 : 60;
+          const onMove = (moveEvent) => {
+            const delta = (moveEvent.clientX - startX) * this.resizeSensitivity;
+            state.widths[widthKey] = Math.max(minWidth, Math.round(startWidth + delta));
+          };
+          const onUp = () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+            document.body.style.cursor = "";
+            document.body.style.userSelect = "";
+          };
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onUp);
+          document.body.style.cursor = "col-resize";
+          document.body.style.userSelect = "none";
+        },
+
+        clampAllTablePages() {
+          const totals = {
+            users: this.users.length,
+            payments: this.payments.length,
+            balances: this.balances.length,
+          };
+          Object.keys(this.tableUi).forEach((tableName) => {
+            const state = this.tableUi[tableName];
+            const maxPage = Math.max(0, this.getTablePageCount(tableName, totals[tableName] || 0) - 1);
+            if (state.page > maxPage) state.page = maxPage;
+          });
         },
 
         getFormattedAmount(amount, exchangeRate) {
@@ -1012,6 +1228,11 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
           } catch (_) {
             return `${currency} ${numericAmount.toLocaleString()}`;
           }
+        },
+
+        getBalanceAmountDisplay(balance) {
+          if (!balance) return "";
+          return this.getFormattedAmount(balance.Amount, balance.Currency);
         },
 
         isCrossCurrencyPayment(payment) {
@@ -1079,26 +1300,15 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
             this.users    = Array.isArray(users)    ? users    : [];
 
             this.payments = Array.isArray(payments) ? payments : [];
-            
-            // update payment pagination
-            await this.updatePaymentPagination(this.payments);
-
             this.balances = Array.isArray(balancesResp.data) ? balancesResp.data : [];
             this.balancesRaw = balancesResp.raw;
+            this.clampAllTablePages();
+            this.activePaymentRateId = null;
             if (this.balancesView === "code") this.highlightBalances();
             if (!background) this.flashError("");
           } catch (e) {
             this.flashError(`Load failed: ${e.message}`);
           }
-        },
-
-        async updatePaymentPagination(payments) {
-          this.paymentPagesData = [];
-          for (let i = 0; i < payments.length; i += this.pageSize) {
-            this.paymentPagesData.push(payments.slice(i, i + this.pageSize));
-          }
-          const maxPage = Math.max(0, this.paymentPagesData.length - 1);
-          if (this.currentPaymentsPage > maxPage) this.currentPaymentsPage = maxPage;
         },
 
         async createUser() {

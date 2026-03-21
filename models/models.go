@@ -49,6 +49,7 @@ type BalanceDBEntry struct {
 	FromUserID uint    `gorm:"not null;index:idx_from_to,unique"`
 	ToUserID   uint    `gorm:"not null;index:idx_from_to,unique"`
 	Amount     float64 `gorm:"not null"`
+	Currency   string
 }
 
 func (BalanceDBEntry) TableName() string { return "balances" }
@@ -57,4 +58,5 @@ type Balance struct {
 	FromUser string
 	ToUser   string
 	Amount   float64
+	Currency string
 }
