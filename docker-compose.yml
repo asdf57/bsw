@@ -19,7 +19,9 @@ services:
     restart: unless-stopped
 
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.api
     container_name: bsw
     ports:
       - "8080:8080"
@@ -44,6 +46,18 @@ services:
       - "8081:80"
     environment:
       API_BASE: http://localhost:8080
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: "bot"
+    environment:
+      DISCORD_BOT_TOKEN: ""
+      API_URL: "http://app:8080"
     depends_on:
       - app
     restart: unless-stopped
