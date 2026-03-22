@@ -1,6 +1,9 @@
 <?php
-$apiBase = getenv('API_BASE') ?: 'http://localhost:8080';
-function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8'); }
+$apiBase = getenv("API_BASE") ?: "http://localhost:8080";
+function h(string $v): string
+{
+    return htmlspecialchars($v, ENT_QUOTES, "UTF-8");
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -630,7 +633,7 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
 
     <header class="header">
       <h1>BSW</h1>
-      <span class="api-badge"><?= h(rtrim($apiBase, '/')) ?></span>
+      <span class="api-badge"><?= h(rtrim($apiBase, "/")) ?></span>
     </header>
 
     <div class="alert alert-error" x-show="error" x-transition>
@@ -982,7 +985,7 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
 
   <script>
     function app() {
-      const apiBase = "<?= h(rtrim($apiBase, '/')) ?>";
+      const apiBase = "<?= h(rtrim($apiBase, "/")) ?>";
       const parseError = async (resp) => {
         try {
           const j = await resp.json();
@@ -1028,7 +1031,7 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
         fromExchangeRateOpen: false,
         toExchangeRateOpen: false,
         newUserName: "",
-        newPayment: { amount: "", payer: "", description: "", fromExchangeRate: "", toExchangeRate: "", owers: [] },
+        newPayment: { amount: "", payer: "", description: "", fromExchangeRate: "USD", toExchangeRate: "USD", owers: [] },
         modal: { open: false, message: "", onConfirm: null },
         error: "",
         notice: "",
@@ -1361,7 +1364,7 @@ function h(string $v): string { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8')
                 owers,
               }),
             });
-            this.newPayment = { amount: "", payer: "", description: "", fromExchangeRate: "", toExchangeRate: "", owers: [] };
+            this.newPayment = { amount: "", payer: "", description: "", fromExchangeRate: "USD", toExchangeRate: "USD", owers: [] };
             this.payerOpen = false;
             this.owersOpen = false;
             this.fromExchangeRateOpen = false;
