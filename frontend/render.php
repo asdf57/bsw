@@ -375,6 +375,14 @@ function h(string $v): string
       font-size: 12px;
     }
     .btn-danger:hover { background: var(--red-bg); border-color: #f5c6c6; }
+    .btn-success {
+      background: transparent;
+      color: var(--green);
+      border-color: transparent;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+    .btn-success:hover { background: var(--green-bg); border-color: #b8dfc9; }
 
     .data-table { width: 100%; border-collapse: collapse; }
     .table-scroll {
@@ -820,6 +828,7 @@ function h(string $v): string
               <col :style="`width:${tableUi.payments.widths.description}px`">
               <col :style="`width:${tableUi.payments.widths.date}px`">
               <col :style="`width:${tableUi.payments.widths.actions}px`">
+              <col :style="`width:${tableUi.payments.widths.settle}px`">
             </colgroup>
             <thead>
               <tr>
@@ -830,17 +839,18 @@ function h(string $v): string
                 <th class="sortable" @click="toggleTableSort('payments', 'Description')">Description <span class="sort-indicator" x-text="tableSortIndicator('payments', 'Description')"></span><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('payments', 'description', $event)"></span></th>
                 <th class="sortable" @click="toggleTableSort('payments', 'Date')">Date <span class="sort-indicator" x-text="tableSortIndicator('payments', 'Date')"></span><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('payments', 'date', $event)"></span></th>
                 <th><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('payments', 'actions', $event)"></span></th>
+                <th><span class="col-resize-handle" @mousedown.stop.prevent="startColumnResize('payments', 'settle', $event)"></span></th>
               </tr>
             </thead>
             <tbody>
               <template x-if="payments.length === 0">
-                <tr class="empty-row"><td colspan="7">No payments yet</td></tr>
+                <tr class="empty-row"><td colspan="8">No payments yet</td></tr>
               </template>
               <template x-for="p in getTablePageRows('payments', payments)" :key="p.ID">
                 <tr>
                   <td class="cell-id" x-text="p.ID"></td>
                   <td class="cell-id" x-text="p.PayerName"></td>
-                  <td class="cell-id" x-text="p.Owers"></td>
+                  <td class="cell-id" x-text="getOwers(p)"></td>
                   <td class="payment-amount-cell">
                     <template x-if="!isShowingPaymentRate(p.ID)">
                       <button type="button" class="amount-btn payment-amount-group" @click="togglePaymentAmountView(p.ID)">
@@ -867,6 +877,7 @@ function h(string $v): string
                   <td x-text="p.Description"></td>
                   <td class="cell-date" x-text="p.Date"></td>
                   <td><button class="btn btn-danger" @click="deletePayment(p.ID)">Remove</button></td>
+                  <td><button class="btn btn-success" @click="settleUp(p)">Settle</button></td>
                 </tr>
               </template>
             </tbody>
@@ -1047,7 +1058,7 @@ function h(string $v): string
             page: 0,
             size: 10,
             sort: { key: "Date", dir: "desc" },
-            widths: { id: 64, payer: 110, owers: 140, amount: 210, description: 220, date: 176, actions: 96 },
+            widths: { id: 64, payer: 110, owers: 140, amount: 210, description: 220, date: 176, actions: 96, settle: 96 },
           },
           balances: {
             page: 0,
@@ -1160,6 +1171,12 @@ function h(string $v): string
           const sorted = this.getSortedRows(tableName, rows);
           const start = state.page * state.size;
           return sorted.slice(start, start + state.size);
+        },
+
+        getOwers(payment) {
+          console.log("getOwers", payment.Owers);
+          // Need to grab from each Ower the .Name field
+          return Array.isArray(payment?.Owers) ? payment.Owers.map((o) => o.Name).join(", ") : String(payment?.Owers || "");
         },
 
         toggleTableSort(tableName, key) {
@@ -1387,6 +1404,21 @@ function h(string $v): string
             } catch (e) {
               this.flashError(`Delete payment failed: ${e.message}`);
             }
+          });
+        },
+
+        async settleUp(payment, userWhosSettling) {
+          console.log(payment)
+          await req("/api/v1/payment", {
+            method: "POST",
+            body: JSON.stringify({
+              amount:      Number(payment.Amount),
+              payer:       userWhosSettling,
+              description: this.newPayment.description,
+              fromExchangeRate: this.newPayment.fromExchangeRate,
+              toExchangeRate: this.newPayment.toExchangeRate,
+              owers: [],
+            }),
           });
         },
       };
