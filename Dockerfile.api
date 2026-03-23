@@ -9,7 +9,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN go build -o bsw .
+RUN CGO_ENABLED=0 go build -o bsw .
 
 RUN apk add --no-cache postgresql-client
 
