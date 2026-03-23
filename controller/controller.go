@@ -168,7 +168,7 @@ func (ctrl *Controller) GetPayment(c *gin.Context) {
 	id := c.Param("id")
 
 	var p models.PaymentDBEntry
-	if err := ctrl.db.First(&p, id).Error; err != nil {
+	if err := ctrl.db.Preload("Owers").First(&p, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
 			return
@@ -188,7 +188,7 @@ func (ctrl *Controller) GetPayment(c *gin.Context) {
 func (ctrl *Controller) GetPayments(c *gin.Context) {
 	var req []models.PaymentDBEntry
 
-	if err := ctrl.db.Find(&req).Error; err != nil {
+	if err := ctrl.db.Preload("Owers").Find(&req).Error; err != nil {
 		log.Printf("db error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
@@ -234,7 +234,7 @@ func (ctrl *Controller) PostPayment(c *gin.Context) {
 		return
 	}
 
-	// check if the owers exist and get their ids
+	// check if the owers exist and load their user rows for many2many association
 	var owers []models.UserDBEntry
 	for _, ower := range req.Owers {
 		var owerEntry models.UserDBEntry
@@ -242,6 +242,7 @@ func (ctrl *Controller) PostPayment(c *gin.Context) {
 		// if ower == payer, then you've done something wrong
 		if ower == payer.Name {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "payer cannot owe itself"})
+			return
 		}
 
 		if err := ctrl.db.Where("name = ?", ower).First(&owerEntry).Error; err != nil {
@@ -496,6 +497,119 @@ func (ctrl *Controller) GetUser(c *gin.Context) {
 	c.JSON(http.StatusOK, p)
 }
 
+// GetUser godoc
+// @Summary Get all user's balances
+// @Router /api/v1/user/balances/all [get]
+func (ctrl *Controller) GetBalancesByUser(c *gin.Context) {
+	var users []models.UserDBEntry
+	if err := ctrl.db.Find(&users).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no users found"})
+			return
+		}
+
+		log.Printf("db error while fetching users: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while fetching users"})
+		return
+	}
+
+	var balances []models.BalanceDBEntry
+	userBalances := make(map[string][]models.BalanceDBEntry)
+
+	for _, user := range users {
+		if err := ctrl.db.Where("from_user_id = ?", user.ID).Find(&balances).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "no balances found for user " + user.Name})
+				return
+			}
+
+			log.Printf("db error while fetching balances for user %s: %v", user.Name, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while fetching balances for user " + user.Name})
+			return
+		}
+
+		userName, err := ctrl.resolveUserNameFromId(user.ID)
+		if err != nil {
+			log.Printf("failed to resolve user name from id: %s", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while fetching user name from id"})
+			return
+		}
+
+		userBalances[*userName] = balances
+	}
+
+	c.JSON(http.StatusOK, userBalances)
+}
+
+// GetUser godoc
+// @Summary Get all user's balances
+// @Router /api/v1/user/debts/all [get]
+func (ctrl *Controller) GetUsersDebts(c *gin.Context) {
+	var users []models.UserDBEntry
+	if err := ctrl.db.Find(&users).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no users found"})
+			return
+		}
+
+		log.Printf("db error while fetching users: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while fetching users"})
+		return
+	}
+
+	var balances []models.BalanceDBEntry
+	userBalances := make(map[string][]models.BalanceDBEntry)
+
+	for _, user := range users {
+		if err := ctrl.db.Where("from_user_id = ?", user.ID).Find(&balances).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "no balances found for user " + user.Name})
+				return
+			}
+
+			log.Printf("db error while fetching balances for user %s: %v", user.Name, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while fetching balances for user " + user.Name})
+			return
+		}
+
+		userName, err := ctrl.resolveUserNameFromId(user.ID)
+		if err != nil {
+			log.Printf("failed to resolve user name from id: %s", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while fetching user name from id"})
+			return
+		}
+
+		userBalances[*userName] = balances
+	}
+
+	// Now we need to sum up the total amount owed to each user...
+
+	results := make(map[string]map[string]float64)
+
+	for user, debts := range userBalances {
+		userOwesWhoMap := make(map[string]float64)
+		for _, entry := range debts {
+			userWeOweId := entry.FromUserID
+			userWeOweName, err := ctrl.resolveUserNameFromId(userWeOweId)
+			if err != nil {
+				log.Printf("failed to resolve user name from id: %s", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error while fetching user name from id"})
+				return
+			}
+
+			if _, ok := userOwesWhoMap[*userWeOweName]; !ok {
+				userOwesWhoMap[*userWeOweName] = 0.0
+			} else {
+				userOwesWhoMap[*userWeOweName] += entry.Amount
+			}
+		}
+
+		results[user] = userOwesWhoMap
+	}
+
+	c.JSON(http.StatusOK, results)
+}
+
 // GetUsers godoc
 // @Summary Get all users
 // @Router /api/v1/user/all [get]
@@ -537,7 +651,7 @@ func (ctrl *Controller) UpdateBalances(c *gin.Context) {
 		amountPerOwer := paymentDbEntry.Amount / float64(len(owers))
 
 		for _, ower := range owers {
-			log.Printf("Adding payment %d: %s owes %s $%.2f in currency %s\n", paymentDbEntry.ID, ower.Name, paymentDbEntry.PayerName, amountPerOwer, paymentDbEntry.FromExchangeRate)
+			//log.Printf("Adding payment %d: %s owes %s $%.2f in currency %s\n", paymentDbEntry.ID, ower.Name, paymentDbEntry.PayerName, amountPerOwer, paymentDbEntry.FromExchangeRate)
 			raw[debtKey{From: ower.ID, To: payerId, Currency: paymentDbEntry.FromExchangeRate}] += amountPerOwer
 		}
 	}
