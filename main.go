@@ -78,6 +78,8 @@ func main() {
 			user.GET("/:name", ctrl.GetUser)
 			user.GET("/all", ctrl.GetUsers)
 			user.DELETE("/:name", ctrl.DeleteUser)
+			user.GET("/balances/all", ctrl.GetBalancesByUser)
+			user.GET("/debts/all", ctrl.GetUsersDebts)
 		}
 
 		balance := v1.Group("/balance")

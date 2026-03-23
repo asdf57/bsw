@@ -291,6 +291,18 @@ const docTemplate = `{
                 "responses": {}
             }
         },
+        "/api/v1/user/balances/all": {
+            "get": {
+                "summary": "Get all user's balances",
+                "responses": {}
+            }
+        },
+        "/api/v1/user/debts/all": {
+            "get": {
+                "summary": "Get all user's balances",
+                "responses": {}
+            }
+        },
         "/api/v1/user/{name}": {
             "get": {
                 "summary": "Get a user by name",

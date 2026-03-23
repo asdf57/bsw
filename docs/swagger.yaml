@@ -236,6 +236,14 @@ paths:
     get:
       responses: {}
       summary: Get all users
+  /api/v1/user/balances/all:
+    get:
+      responses: {}
+      summary: Get all user's balances
+  /api/v1/user/debts/all:
+    get:
+      responses: {}
+      summary: Get all user's balances
 securityDefinitions:
   BasicAuth:
     type: basic
