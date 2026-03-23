@@ -1,5 +1,17 @@
-- yen conversion
-- drop down for owers
+- ~~yen conversion
+- ~~drop down for owers
 - custom dates
 - tagging system
 - paginate payments
+
+- Settling up
+- Display in 1 currency (USD)
+- Fix deadlocking
+- Discord bot
+  - Add payments
+  - Delete payments
+  - Settle up
+- Default currencies per payment (USD -> USD)
+
+Nice to have:
+- Tagging systems -- transppration, food, housing, other
