@@ -1,8 +1,11 @@
 .PHONY: build build-frontend connect-db clean
 
 build:
-	go run github.com/swaggo/swag/cmd/swag@latest init
+	go run github.com/swaggo/swag/cmd/swag@latest init -g main.go -d cmd/api,internal --parseDependency --parseInternal
 	docker compose up -d --build
+	@printf '\nAPI: %s\nSwagger UI: %s\n\n' \
+		'http://localhost:8080' \
+		'http://localhost:8080/swagger/index.html'
 
 build-frontend:
 	docker compose build frontend

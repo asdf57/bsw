@@ -1,18 +1,16 @@
-FROM golang:1.25-alpine AS prereqs
+FROM golang:1.25-alpine AS build
+
+WORKDIR /app
 
 COPY go.mod go.sum ./
 RUN go mod download
 
-FROM prereqs AS final
-
-WORKDIR /app
-
 COPY . .
 
-RUN CGO_ENABLED=0 go build -o bsw .
+RUN CGO_ENABLED=0 go build -o /bsw ./cmd/api
 
 RUN apk add --no-cache postgresql-client
 
 EXPOSE 8080
 
-CMD ["./bsw"]
+CMD ["/bsw"]

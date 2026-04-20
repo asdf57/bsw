@@ -1,21 +1,110 @@
-basePath: /
 definitions:
+  gorm.DeletedAt:
+    properties:
+      time:
+        type: string
+      valid:
+        description: Valid is true if Time is not NULL
+        type: boolean
+    type: object
+  models.DebtDBEntry:
+    properties:
+      amount:
+        type: number
+      createdAt:
+        type: string
+      currency:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      id:
+        type: integer
+      owedByUserId:
+        type: integer
+      owedToUserId:
+        type: integer
+      updatedAt:
+        type: string
+    type: object
+  models.Exchange:
+    properties:
+      date:
+        type: string
+      fromCurrency:
+        type: string
+      rate:
+        format: float64
+        type: number
+      toCurrency:
+        type: string
+    type: object
+  models.ExchangeDBEntry:
+    properties:
+      createdAt:
+        type: string
+      date:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      fromCurrency:
+        type: string
+      id:
+        type: integer
+      rate:
+        format: float64
+        type: number
+      toCurrency:
+        type: string
+      updatedAt:
+        type: string
+    type: object
   models.Payment:
     properties:
       amount:
         format: float64
         type: number
+      date:
+        type: string
+      debtMode:
+        type: string
+      debtors:
+        items:
+          type: string
+        type: array
       description:
         type: string
       fromExchangeRate:
         type: string
-      owers:
-        items:
-          type: string
-        type: array
       payer:
         type: string
       toExchangeRate:
+        type: string
+    type: object
+  models.PaymentDBEntry:
+    properties:
+      amount:
+        type: number
+      createdAt:
+        type: string
+      date:
+        type: string
+      debtors:
+        items:
+          $ref: '#/definitions/models.UserDBEntry'
+        type: array
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      description:
+        type: string
+      exchange:
+        $ref: '#/definitions/models.ExchangeDBEntry'
+      exchangeID:
+        type: integer
+      id:
+        type: integer
+      payerID:
+        type: integer
+      updatedAt:
         type: string
     type: object
   models.User:
@@ -23,22 +112,21 @@ definitions:
       name:
         type: string
     type: object
-externalDocs:
-  description: OpenAPI
-  url: https://swagger.io/resources/open-api/
-host: localhost:8080
+  models.UserDBEntry:
+    properties:
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      id:
+        type: integer
+      name:
+        type: string
+      updatedAt:
+        type: string
+    type: object
 info:
-  contact:
-    email: support@swagger.io
-    name: API Support
-    url: http://www.swagger.io/support
-  description: This is a sample server celler server.
-  license:
-    name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
-  termsOfService: http://swagger.io/terms/
-  title: Swagger Example API
-  version: "1.0"
+  contact: {}
 paths:
   /api/v1/admin/backup:
     post:
@@ -100,6 +188,8 @@ paths:
       - admin
   /api/v1/admin/exchange-rate:
     get:
+      description: Returns the exchange rate for `from` -> `to` on a given date (defaults
+        to today if date is omitted).
       parameters:
       - description: Base currency code (e.g. USD)
         in: query
@@ -111,28 +201,105 @@ paths:
         name: to
         required: true
         type: string
-      responses: {}
+      - description: Date in YYYY-MM-DD format
+        in: query
+        name: date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Exchange'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       summary: Get exchange rate between two currencies
       tags:
       - admin
-  /api/v1/balance/all:
+  /api/v1/debts:
     get:
-      responses: {}
-      summary: Get all balances
-    post:
-      responses: {}
-      summary: Update all balances
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.DebtDBEntry'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Fetch all debts as From-To user debt pairs
+      tags:
+      - debts
+  /api/v1/debts/debts/users:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/models.DebtDBEntry'
+              type: array
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Fetch a map of users to their debts
+      tags:
+      - debts
   /api/v1/health:
     get:
-      responses: {}
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       summary: Health check
+      tags:
+      - health
   /api/v1/payment:
     post:
       consumes:
       - application/json
-      description: save a payment in the database
       parameters:
-      - description: payment data
+      - description: Payment payload
         in: body
         name: payment
         required: true
@@ -144,7 +311,9 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Payment'
+            additionalProperties:
+              type: string
+            type: object
         "400":
           description: Bad Request
           schema:
@@ -158,6 +327,8 @@ paths:
               type: string
             type: object
       summary: Create a new payment
+      tags:
+      - payment
   /api/v1/payment/{id}:
     delete:
       parameters:
@@ -166,8 +337,30 @@ paths:
         name: id
         required: true
         type: integer
-      responses: {}
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       summary: Delete a payment by ID
+      tags:
+      - payment
     get:
       parameters:
       - description: Payment ID
@@ -175,19 +368,73 @@ paths:
         name: id
         required: true
         type: integer
-      responses: {}
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PaymentDBEntry'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       summary: Get a payment by ID
+      tags:
+      - payment
   /api/v1/payment/all:
     get:
-      responses: {}
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.PaymentDBEntry'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       summary: Get all payments
+      tags:
+      - payment
   /api/v1/user:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.User'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get all users
+      tags:
+      - user
     post:
       consumes:
       - application/json
-      description: save a user in the database
       parameters:
-      - description: user data
+      - description: User payload
         in: body
         name: user
         required: true
@@ -199,7 +446,9 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.User'
+            additionalProperties:
+              type: string
+            type: object
         "400":
           description: Bad Request
           schema:
@@ -213,38 +462,6 @@ paths:
               type: string
             type: object
       summary: Create a new user
-  /api/v1/user/{name}:
-    delete:
-      parameters:
-      - description: user name
-        in: path
-        name: name
-        required: true
-        type: string
-      responses: {}
-      summary: Delete a user by user by name
-    get:
-      parameters:
-      - description: User name
-        in: path
-        name: name
-        required: true
-        type: string
-      responses: {}
-      summary: Get a user by name
-  /api/v1/user/all:
-    get:
-      responses: {}
-      summary: Get all users
-  /api/v1/user/balances/all:
-    get:
-      responses: {}
-      summary: Get all user's balances
-  /api/v1/user/debts/all:
-    get:
-      responses: {}
-      summary: Get all user's balances
-securityDefinitions:
-  BasicAuth:
-    type: basic
+      tags:
+      - user
 swagger: "2.0"
