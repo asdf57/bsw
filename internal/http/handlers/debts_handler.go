@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/asdf57/bsw/internal/models"
+	apimodels "github.com/asdf57/bsw/internal/models/api"
+	dbmodels "github.com/asdf57/bsw/internal/models/db"
+	"github.com/asdf57/bsw/internal/models/mappers"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -16,12 +18,12 @@ import (
 // @Summary Fetch all debts as From-To user debt pairs
 // @Tags debts
 // @Produce json
-// @Success 200 {array} models.DebtDBEntry
+// @Success 200 {array} api.DebtResponse
 // @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/debts [get]
 func (h *Handlers) GetDebts(c *gin.Context) {
-	var debts []models.DebtDBEntry
+	var debts []dbmodels.DebtDBEntry
 
 	if err := h.Db.DB.Order("id").Find(&debts).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -34,19 +36,19 @@ func (h *Handlers) GetDebts(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, debts)
+	c.JSON(http.StatusOK, mappers.DebtResponsesFromDB(debts))
 }
 
 // GetAllUserDebts godoc
 // @Summary Fetch a map of users to their debts
 // @Tags debts
 // @Produce json
-// @Success 200 {object} map[string][]models.DebtDBEntry
+// @Success 200 {object} map[string][]api.DebtResponse
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/debts/debts/users [get]
 func (h *Handlers) GetAllUserDebts(c *gin.Context) {
-	var debts []models.DebtDBEntry
-	debtsMap := make(map[string][]models.DebtDBEntry)
+	var debts []dbmodels.DebtDBEntry
+	debtsMap := make(map[string][]apimodels.DebtResponse)
 
 	if err := h.Db.DB.Find(&debts).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "unhandled error while retrieving debts"})
@@ -65,7 +67,7 @@ func (h *Handlers) GetAllUserDebts(c *gin.Context) {
 		ids = append(ids, id)
 	}
 
-	var users []models.UserDBEntry
+	var users []dbmodels.UserDBEntry
 	if err := h.Db.DB.Where("id IN ?", ids).Find(&users).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "unhandled error while querying for users"})
 		return
@@ -74,16 +76,16 @@ func (h *Handlers) GetAllUserDebts(c *gin.Context) {
 	for _, user := range users {
 		for _, debt := range debts {
 			if debt.OwedByUserId == user.ID {
-				debtsMap[user.Name] = append(debtsMap[user.Name], debt)
+				debtsMap[user.Name] = append(debtsMap[user.Name], mappers.DebtResponseFromDB(debt))
 			}
 		}
 	}
 
-	c.JSON(http.StatusOK, debts)
+	c.JSON(http.StatusOK, debtsMap)
 }
 
 func (h *Handlers) AddDebt(c *gin.Context) {
-	var debt models.DebtEntry
+	var debt apimodels.DebtEntry
 
 	if err := c.ShouldBind(&debt); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -111,7 +113,7 @@ func (h *Handlers) AddDebt(c *gin.Context) {
 
 	parsedAmount := decimal.NewFromFloat(debt.Amount)
 
-	debtEntry := models.DebtDBEntry{
+	debtEntry := dbmodels.DebtDBEntry{
 		OwedByUserId: owedByUserId,
 		OwedToUserId: owedToUserId,
 		Amount:       parsedAmount,

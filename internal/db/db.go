@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/asdf57/bsw/internal/models"
+	dbmodels "github.com/asdf57/bsw/internal/models/db"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -27,10 +27,10 @@ func NewBswDB() *BswDB {
 	}
 
 	if err := db.AutoMigrate(
-		&models.UserDBEntry{},
-		&models.ExchangeDBEntry{},
-		&models.PaymentDBEntry{},
-		&models.DebtDBEntry{},
+		&dbmodels.UserDBEntry{},
+		&dbmodels.ExchangeDBEntry{},
+		&dbmodels.PaymentDBEntry{},
+		&dbmodels.DebtDBEntry{},
 	); err != nil {
 		log.Fatalf("auto-migrate failed: %v", err)
 	}
@@ -38,8 +38,8 @@ func NewBswDB() *BswDB {
 	return &BswDB{DB: db}
 }
 
-func (b *BswDB) GetUserFromName(name string) (*models.UserDBEntry, error) {
-	var user models.UserDBEntry
+func (b *BswDB) GetUserFromName(name string) (*dbmodels.UserDBEntry, error) {
+	var user dbmodels.UserDBEntry
 
 	if err := b.DB.Where("name = ?", name).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -54,7 +54,7 @@ func (b *BswDB) GetUserFromName(name string) (*models.UserDBEntry, error) {
 func (b *BswDB) GetUserIdFromName(name string) (uint, error) {
 	var uid uint
 
-	if err := b.DB.Model(&models.UserDBEntry{}).Where("name = ?", name).Select("id").Take(&uid).Error; err != nil {
+	if err := b.DB.Model(&dbmodels.UserDBEntry{}).Where("name = ?", name).Select("id").Take(&uid).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			fmt.Printf("failed to find user: %s", err)
 			return 0, err
@@ -67,12 +67,12 @@ func (b *BswDB) GetUserIdFromName(name string) (uint, error) {
 	return uid, nil
 }
 
-func (b *BswDB) GetUsersFromNames(names []string) ([]models.UserDBEntry, error) {
+func (b *BswDB) GetUsersFromNames(names []string) ([]dbmodels.UserDBEntry, error) {
 	if len(names) == 0 {
-		return []models.UserDBEntry{}, nil
+		return []dbmodels.UserDBEntry{}, nil
 	}
 
-	var users []models.UserDBEntry
+	var users []dbmodels.UserDBEntry
 	if err := b.DB.Where("name IN ?", names).Find(&users).Error; err != nil {
 		return nil, fmt.Errorf("get users by names: %w", err)
 	}

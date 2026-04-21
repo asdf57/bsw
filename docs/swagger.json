@@ -128,7 +128,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.Exchange"
+                            "$ref": "#/definitions/api.Exchange"
                         }
                     },
                     "400": {
@@ -167,7 +167,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.DebtDBEntry"
+                                "$ref": "#/definitions/api.DebtResponse"
                             }
                         }
                     },
@@ -209,7 +209,7 @@
                             "additionalProperties": {
                                 "type": "array",
                                 "items": {
-                                    "$ref": "#/definitions/models.DebtDBEntry"
+                                    "$ref": "#/definitions/api.DebtResponse"
                                 }
                             }
                         }
@@ -274,7 +274,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.Payment"
+                            "$ref": "#/definitions/api.Payment"
                         }
                     }
                 ],
@@ -324,7 +324,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.PaymentDBEntry"
+                                "$ref": "#/definitions/api.PaymentResponse"
                             }
                         }
                     },
@@ -362,7 +362,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.PaymentDBEntry"
+                            "$ref": "#/definitions/api.PaymentResponse"
                         }
                     },
                     "404": {
@@ -448,7 +448,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.User"
+                                "$ref": "#/definitions/api.UserSummary"
                             }
                         }
                     },
@@ -481,7 +481,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.User"
+                            "$ref": "#/definitions/api.User"
                         }
                     }
                 ],
@@ -518,32 +518,14 @@
         }
     },
     "definitions": {
-        "gorm.DeletedAt": {
-            "type": "object",
-            "properties": {
-                "time": {
-                    "type": "string"
-                },
-                "valid": {
-                    "description": "Valid is true if Time is not NULL",
-                    "type": "boolean"
-                }
-            }
-        },
-        "models.DebtDBEntry": {
+        "api.DebtResponse": {
             "type": "object",
             "properties": {
                 "amount": {
                     "type": "number"
                 },
-                "createdAt": {
-                    "type": "string"
-                },
                 "currency": {
                     "type": "string"
-                },
-                "deletedAt": {
-                    "$ref": "#/definitions/gorm.DeletedAt"
                 },
                 "id": {
                     "type": "integer"
@@ -551,15 +533,18 @@
                 "owedByUserId": {
                     "type": "integer"
                 },
+                "owedByUserName": {
+                    "type": "string"
+                },
                 "owedToUserId": {
                     "type": "integer"
                 },
-                "updatedAt": {
+                "owedToUserName": {
                     "type": "string"
                 }
             }
         },
-        "models.Exchange": {
+        "api.Exchange": {
             "type": "object",
             "properties": {
                 "date": {
@@ -569,25 +554,18 @@
                     "type": "string"
                 },
                 "rate": {
-                    "type": "number",
-                    "format": "float64"
+                    "type": "number"
                 },
                 "toCurrency": {
                     "type": "string"
                 }
             }
         },
-        "models.ExchangeDBEntry": {
+        "api.ExchangeSummary": {
             "type": "object",
             "properties": {
-                "createdAt": {
-                    "type": "string"
-                },
                 "date": {
                     "type": "string"
-                },
-                "deletedAt": {
-                    "$ref": "#/definitions/gorm.DeletedAt"
                 },
                 "fromCurrency": {
                     "type": "string"
@@ -596,23 +574,18 @@
                     "type": "integer"
                 },
                 "rate": {
-                    "type": "number",
-                    "format": "float64"
+                    "type": "number"
                 },
                 "toCurrency": {
-                    "type": "string"
-                },
-                "updatedAt": {
                     "type": "string"
                 }
             }
         },
-        "models.Payment": {
+        "api.Payment": {
             "type": "object",
             "properties": {
                 "amount": {
-                    "type": "number",
-                    "format": "float64"
+                    "type": "number"
                 },
                 "date": {
                     "type": "string"
@@ -640,14 +613,11 @@
                 }
             }
         },
-        "models.PaymentDBEntry": {
+        "api.PaymentResponse": {
             "type": "object",
             "properties": {
                 "amount": {
                     "type": "number"
-                },
-                "createdAt": {
-                    "type": "string"
                 },
                 "date": {
                     "type": "string"
@@ -655,33 +625,24 @@
                 "debtors": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.UserDBEntry"
+                        "$ref": "#/definitions/api.UserSummary"
                     }
-                },
-                "deletedAt": {
-                    "$ref": "#/definitions/gorm.DeletedAt"
                 },
                 "description": {
                     "type": "string"
                 },
                 "exchange": {
-                    "$ref": "#/definitions/models.ExchangeDBEntry"
-                },
-                "exchangeID": {
-                    "type": "integer"
+                    "$ref": "#/definitions/api.ExchangeSummary"
                 },
                 "id": {
                     "type": "integer"
                 },
-                "payerID": {
-                    "type": "integer"
-                },
-                "updatedAt": {
-                    "type": "string"
+                "payer": {
+                    "$ref": "#/definitions/api.UserSummary"
                 }
             }
         },
-        "models.User": {
+        "api.User": {
             "type": "object",
             "properties": {
                 "name": {
@@ -689,22 +650,13 @@
                 }
             }
         },
-        "models.UserDBEntry": {
+        "api.UserSummary": {
             "type": "object",
             "properties": {
-                "createdAt": {
-                    "type": "string"
-                },
-                "deletedAt": {
-                    "$ref": "#/definitions/gorm.DeletedAt"
-                },
                 "id": {
                     "type": "integer"
                 },
                 "name": {
-                    "type": "string"
-                },
-                "updatedAt": {
                     "type": "string"
                 }
             }

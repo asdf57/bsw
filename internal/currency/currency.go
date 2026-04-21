@@ -7,14 +7,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/asdf57/bsw/internal/models"
+	apimodels "github.com/asdf57/bsw/internal/models/api"
+	dbmodels "github.com/asdf57/bsw/internal/models/db"
 )
 
-func GetExchangeRate(fromCurrency, toCurrency string, time time.Time) (models.Exchange, error) {
+func GetExchangeRate(fromCurrency, toCurrency string, time time.Time) (apimodels.Exchange, error) {
 	dateStr := time.Format("2006-01-02")
 
 	if fromCurrency == toCurrency {
-		return models.Exchange{
+		return apimodels.Exchange{
 			FromCurrency: fromCurrency,
 			ToCurrency:   toCurrency,
 			Rate:         1.0,
@@ -29,13 +30,13 @@ func GetExchangeRate(fromCurrency, toCurrency string, time time.Time) (models.Ex
 	res, err := http.Get(url)
 	if err != nil {
 		fmt.Print("failed to obtain exchange rate")
-		return models.Exchange{}, fmt.Errorf("failed to obtain exchange rate: %s", err)
+		return apimodels.Exchange{}, fmt.Errorf("failed to obtain exchange rate: %s", err)
 	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return models.Exchange{}, fmt.Errorf("failed to retrieve the exchange rate from API: %s", res.Status)
+		return apimodels.Exchange{}, fmt.Errorf("failed to retrieve the exchange rate from API: %s", res.Status)
 	}
 
 	var queryRes []struct {
@@ -46,16 +47,16 @@ func GetExchangeRate(fromCurrency, toCurrency string, time time.Time) (models.Ex
 	}
 
 	if err := json.NewDecoder(res.Body).Decode(&queryRes); err != nil {
-		return models.Exchange{}, fmt.Errorf("failed to coerce exchange rate data: %s", err)
+		return apimodels.Exchange{}, fmt.Errorf("failed to coerce exchange rate data: %s", err)
 	}
 
 	log.Printf("Got exchange rate res: %+v", queryRes)
 
 	if len(queryRes) != 1 {
-		return models.Exchange{}, fmt.Errorf("unexpected length from exchange rate query: %d", len(queryRes))
+		return apimodels.Exchange{}, fmt.Errorf("unexpected length from exchange rate query: %d", len(queryRes))
 	}
 
-	currencyExchange := models.Exchange{
+	currencyExchange := apimodels.Exchange{
 		FromCurrency: fromCurrency,
 		ToCurrency:   toCurrency,
 		Rate:         queryRes[0].Rate,
@@ -65,13 +66,13 @@ func GetExchangeRate(fromCurrency, toCurrency string, time time.Time) (models.Ex
 	return currencyExchange, nil
 }
 
-func GetExchangeRateDBEntry(fromCurrency, toCurrency string, time time.Time) (models.ExchangeDBEntry, error) {
+func GetExchangeRateDBEntry(fromCurrency, toCurrency string, time time.Time) (dbmodels.ExchangeDBEntry, error) {
 	exchangeData, err := GetExchangeRate(fromCurrency, toCurrency, time)
 	if err != nil {
-		return models.ExchangeDBEntry{}, err
+		return dbmodels.ExchangeDBEntry{}, err
 	}
 
-	return models.ExchangeDBEntry{
+	return dbmodels.ExchangeDBEntry{
 		FromCurrency: exchangeData.FromCurrency,
 		ToCurrency:   exchangeData.ToCurrency,
 		Rate:         exchangeData.Rate,

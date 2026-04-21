@@ -139,7 +139,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.Exchange"
+                            "$ref": "#/definitions/api.Exchange"
                         }
                     },
                     "400": {
@@ -178,7 +178,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.DebtDBEntry"
+                                "$ref": "#/definitions/api.DebtResponse"
                             }
                         }
                     },
@@ -220,7 +220,7 @@ const docTemplate = `{
                             "additionalProperties": {
                                 "type": "array",
                                 "items": {
-                                    "$ref": "#/definitions/models.DebtDBEntry"
+                                    "$ref": "#/definitions/api.DebtResponse"
                                 }
                             }
                         }
@@ -285,7 +285,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.Payment"
+                            "$ref": "#/definitions/api.Payment"
                         }
                     }
                 ],
@@ -335,7 +335,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.PaymentDBEntry"
+                                "$ref": "#/definitions/api.PaymentResponse"
                             }
                         }
                     },
@@ -373,7 +373,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.PaymentDBEntry"
+                            "$ref": "#/definitions/api.PaymentResponse"
                         }
                     },
                     "404": {
@@ -459,7 +459,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.User"
+                                "$ref": "#/definitions/api.UserSummary"
                             }
                         }
                     },
@@ -492,7 +492,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.User"
+                            "$ref": "#/definitions/api.User"
                         }
                     }
                 ],
@@ -529,32 +529,14 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "gorm.DeletedAt": {
-            "type": "object",
-            "properties": {
-                "time": {
-                    "type": "string"
-                },
-                "valid": {
-                    "description": "Valid is true if Time is not NULL",
-                    "type": "boolean"
-                }
-            }
-        },
-        "models.DebtDBEntry": {
+        "api.DebtResponse": {
             "type": "object",
             "properties": {
                 "amount": {
                     "type": "number"
                 },
-                "createdAt": {
-                    "type": "string"
-                },
                 "currency": {
                     "type": "string"
-                },
-                "deletedAt": {
-                    "$ref": "#/definitions/gorm.DeletedAt"
                 },
                 "id": {
                     "type": "integer"
@@ -562,15 +544,18 @@ const docTemplate = `{
                 "owedByUserId": {
                     "type": "integer"
                 },
+                "owedByUserName": {
+                    "type": "string"
+                },
                 "owedToUserId": {
                     "type": "integer"
                 },
-                "updatedAt": {
+                "owedToUserName": {
                     "type": "string"
                 }
             }
         },
-        "models.Exchange": {
+        "api.Exchange": {
             "type": "object",
             "properties": {
                 "date": {
@@ -580,25 +565,18 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "rate": {
-                    "type": "number",
-                    "format": "float64"
+                    "type": "number"
                 },
                 "toCurrency": {
                     "type": "string"
                 }
             }
         },
-        "models.ExchangeDBEntry": {
+        "api.ExchangeSummary": {
             "type": "object",
             "properties": {
-                "createdAt": {
-                    "type": "string"
-                },
                 "date": {
                     "type": "string"
-                },
-                "deletedAt": {
-                    "$ref": "#/definitions/gorm.DeletedAt"
                 },
                 "fromCurrency": {
                     "type": "string"
@@ -607,23 +585,18 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "rate": {
-                    "type": "number",
-                    "format": "float64"
+                    "type": "number"
                 },
                 "toCurrency": {
-                    "type": "string"
-                },
-                "updatedAt": {
                     "type": "string"
                 }
             }
         },
-        "models.Payment": {
+        "api.Payment": {
             "type": "object",
             "properties": {
                 "amount": {
-                    "type": "number",
-                    "format": "float64"
+                    "type": "number"
                 },
                 "date": {
                     "type": "string"
@@ -651,14 +624,11 @@ const docTemplate = `{
                 }
             }
         },
-        "models.PaymentDBEntry": {
+        "api.PaymentResponse": {
             "type": "object",
             "properties": {
                 "amount": {
                     "type": "number"
-                },
-                "createdAt": {
-                    "type": "string"
                 },
                 "date": {
                     "type": "string"
@@ -666,33 +636,24 @@ const docTemplate = `{
                 "debtors": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.UserDBEntry"
+                        "$ref": "#/definitions/api.UserSummary"
                     }
-                },
-                "deletedAt": {
-                    "$ref": "#/definitions/gorm.DeletedAt"
                 },
                 "description": {
                     "type": "string"
                 },
                 "exchange": {
-                    "$ref": "#/definitions/models.ExchangeDBEntry"
-                },
-                "exchangeID": {
-                    "type": "integer"
+                    "$ref": "#/definitions/api.ExchangeSummary"
                 },
                 "id": {
                     "type": "integer"
                 },
-                "payerID": {
-                    "type": "integer"
-                },
-                "updatedAt": {
-                    "type": "string"
+                "payer": {
+                    "$ref": "#/definitions/api.UserSummary"
                 }
             }
         },
-        "models.User": {
+        "api.User": {
             "type": "object",
             "properties": {
                 "name": {
@@ -700,22 +661,13 @@ const docTemplate = `{
                 }
             }
         },
-        "models.UserDBEntry": {
+        "api.UserSummary": {
             "type": "object",
             "properties": {
-                "createdAt": {
-                    "type": "string"
-                },
-                "deletedAt": {
-                    "$ref": "#/definitions/gorm.DeletedAt"
-                },
                 "id": {
                     "type": "integer"
                 },
                 "name": {
-                    "type": "string"
-                },
-                "updatedAt": {
                     "type": "string"
                 }
             }

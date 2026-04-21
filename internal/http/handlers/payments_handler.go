@@ -6,7 +6,9 @@ import (
 	"net/http"
 
 	"github.com/asdf57/bsw/internal/currency"
-	"github.com/asdf57/bsw/internal/models"
+	apimodels "github.com/asdf57/bsw/internal/models/api"
+	dbmodels "github.com/asdf57/bsw/internal/models/db"
+	"github.com/asdf57/bsw/internal/models/mappers"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -17,15 +19,15 @@ import (
 // @Tags payment
 // @Produce json
 // @Param id path int true "Payment ID"
-// @Success 200 {object} models.PaymentDBEntry
+// @Success 200 {object} api.PaymentResponse
 // @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/payment/{id} [get]
 func (h *Handlers) GetPayment(c *gin.Context) {
 	id := c.Param("id")
 
-	var p models.PaymentDBEntry
-	if err := h.Db.DB.Preload("Debtors").First(&p, id).Error; err != nil {
+	var p dbmodels.PaymentDBEntry
+	if err := h.Db.DB.Preload("Payer").Preload("Debtors").Preload("Exchange").First(&p, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
 			return
@@ -35,25 +37,25 @@ func (h *Handlers) GetPayment(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, p)
+	c.JSON(http.StatusOK, mappers.PaymentResponseFromDB(p))
 }
 
 // GetPayments godoc
 // @Summary Get all payments
 // @Tags payment
 // @Produce json
-// @Success 200 {array} models.PaymentDBEntry
+// @Success 200 {array} api.PaymentResponse
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/payment/all [get]
 func (h *Handlers) GetAllPayments(c *gin.Context) {
-	var p []models.PaymentDBEntry
+	var p []dbmodels.PaymentDBEntry
 
-	if err := h.Db.DB.Preload("Debtors").Find(&p).Error; err != nil {
+	if err := h.Db.DB.Preload("Payer").Preload("Debtors").Preload("Exchange").Find(&p).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
-	c.JSON(http.StatusOK, p)
+	c.JSON(http.StatusOK, mappers.PaymentResponsesFromDB(p))
 }
 
 // PostPayment godoc
@@ -61,13 +63,13 @@ func (h *Handlers) GetAllPayments(c *gin.Context) {
 // @Tags payment
 // @Accept json
 // @Produce json
-// @Param payment body models.Payment true "Payment payload"
+// @Param payment body api.Payment true "Payment payload"
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/payment [post]
 func (h *Handlers) PostPayment(c *gin.Context) {
-	var payment models.Payment
+	var payment apimodels.Payment
 
 	if err := c.ShouldBind(&payment); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -107,7 +109,7 @@ func (h *Handlers) PostPayment(c *gin.Context) {
 	var paymentId uint
 
 	err = h.Db.DB.Transaction(func(tx *gorm.DB) error {
-		lookupKey := models.ExchangeDBEntry{
+		lookupKey := dbmodels.ExchangeDBEntry{
 			FromCurrency: exchangeRateDbEntry.FromCurrency,
 			ToCurrency:   exchangeRateDbEntry.ToCurrency,
 			Date:         exchangeRateDbEntry.Date,
@@ -119,7 +121,7 @@ func (h *Handlers) PostPayment(c *gin.Context) {
 
 		parsedAmount := decimal.NewFromFloat(payment.Amount)
 
-		record := models.PaymentDBEntry{
+		record := dbmodels.PaymentDBEntry{
 			Amount:      parsedAmount,
 			Description: payment.Description,
 			Date:        payment.Date,
@@ -152,7 +154,7 @@ func (h *Handlers) PostPayment(c *gin.Context) {
 			}
 
 			for _, debtor := range payment.Debtors {
-				debtEntry := models.DebtDBEntry{
+				debtEntry := dbmodels.DebtDBEntry{
 					OwedByUserId: debtorIDsByName[debtor],
 					OwedToUserId: payerId,
 					Amount:       amountOwedPerDebtor,
@@ -188,7 +190,7 @@ func (h *Handlers) PostPayment(c *gin.Context) {
 func (h *Handlers) DeletePayment(c *gin.Context) {
 	id := c.Param("id")
 
-	res := h.Db.DB.Delete(models.PaymentDBEntry{}, id)
+	res := h.Db.DB.Delete(dbmodels.PaymentDBEntry{}, id)
 	if res.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to create payment: %s", res.Error.Error())})
 		return

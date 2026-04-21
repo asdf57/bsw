@@ -20,6 +20,7 @@ func RegisterV1(r *gin.Engine, h *handlers.Handlers) *gin.RouterGroup {
 	users.POST("", h.CreateUser)
 
 	debts := v1.Group("/debts")
+	debts.GET("", h.GetDebts)
 	debts.GET("/debts/users", h.GetAllUserDebts)
 
 	health := v1.Group("/health")
