@@ -7,6 +7,7 @@ import (
 	"os"
 
 	dbmodels "github.com/asdf57/bsw/internal/models/db"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -78,4 +79,21 @@ func (b *BswDB) GetUsersFromNames(names []string) ([]dbmodels.UserDBEntry, error
 	}
 
 	return users, nil
+}
+
+func (b *BswDB) GetExchangeRatesFromDB() ([]dbmodels.ExchangeDBEntry, error) {
+	var exchangeRates []dbmodels.ExchangeDBEntry
+	if err := b.DB.Order("date DESC, from_currency, to_currency").Find(&exchangeRates).Error; err != nil {
+		return nil, fmt.Errorf("get exchange rates: %w", err)
+	}
+
+	return exchangeRates, nil
+}
+
+func IsUniqueConstraintError(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+	return false
 }

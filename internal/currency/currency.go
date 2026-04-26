@@ -11,15 +11,21 @@ import (
 	dbmodels "github.com/asdf57/bsw/internal/models/db"
 )
 
+func NormalizeExchangeDate(t time.Time) time.Time {
+	y, m, d := t.UTC().Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
 func GetExchangeRate(fromCurrency, toCurrency string, time time.Time) (apimodels.Exchange, error) {
-	dateStr := time.Format("2006-01-02")
+	normalizedTime := NormalizeExchangeDate(time)
+	dateStr := normalizedTime.Format("2006-01-02")
 
 	if fromCurrency == toCurrency {
 		return apimodels.Exchange{
 			FromCurrency: fromCurrency,
 			ToCurrency:   toCurrency,
 			Rate:         1.0,
-			Date:         time,
+			Date:         normalizedTime,
 		}, nil
 	}
 
@@ -60,14 +66,15 @@ func GetExchangeRate(fromCurrency, toCurrency string, time time.Time) (apimodels
 		FromCurrency: fromCurrency,
 		ToCurrency:   toCurrency,
 		Rate:         queryRes[0].Rate,
-		Date:         time,
+		Date:         normalizedTime,
 	}
 
 	return currencyExchange, nil
 }
 
 func GetExchangeRateDBEntry(fromCurrency, toCurrency string, time time.Time) (dbmodels.ExchangeDBEntry, error) {
-	exchangeData, err := GetExchangeRate(fromCurrency, toCurrency, time)
+	normalizedTime := NormalizeExchangeDate(time)
+	exchangeData, err := GetExchangeRate(fromCurrency, toCurrency, normalizedTime)
 	if err != nil {
 		return dbmodels.ExchangeDBEntry{}, err
 	}
@@ -76,6 +83,6 @@ func GetExchangeRateDBEntry(fromCurrency, toCurrency string, time time.Time) (db
 		FromCurrency: exchangeData.FromCurrency,
 		ToCurrency:   exchangeData.ToCurrency,
 		Rate:         exchangeData.Rate,
-		Date:         exchangeData.Date,
+		Date:         normalizedTime,
 	}, nil
 }

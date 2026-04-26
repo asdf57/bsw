@@ -7,14 +7,10 @@ definitions:
         type: string
       id:
         type: integer
-      owedByUserId:
-        type: integer
-      owedByUserName:
-        type: string
-      owedToUserId:
-        type: integer
-      owedToUserName:
-        type: string
+      owedByUser:
+        $ref: '#/definitions/api.UserSummary'
+      owedToUser:
+        $ref: '#/definitions/api.UserSummary'
     type: object
   api.Exchange:
     properties:
@@ -192,6 +188,27 @@ paths:
               type: string
             type: object
       summary: Get exchange rate between two currencies
+      tags:
+      - admin
+  /api/v1/admin/exchange-rates:
+    get:
+      description: Returns the exchange rates stored in the DB
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.Exchange'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get all exchange rates stored in the DB
       tags:
       - admin
   /api/v1/debts:
@@ -429,6 +446,44 @@ paths:
               type: string
             type: object
       summary: Create a new user
+      tags:
+      - user
+  /api/v1/user/{id}:
+    delete:
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete a user by ID
       tags:
       - user
 swagger: "2.0"

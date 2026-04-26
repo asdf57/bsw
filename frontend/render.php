@@ -688,7 +688,7 @@ function h(string $v): string
                 <td class="cell-id" x-text="u.ID"></td>
                 <td x-text="u.Name"></td>
                 <td class="cell-date" x-text="u.CreatedAt"></td>
-                <td><button class="btn btn-danger" @click="deleteUser(u.Name)">Remove</button></td>
+                <td><button class="btn btn-danger" @click="deleteUser(u)">Remove</button></td>
               </tr>
             </template>
           </tbody>
@@ -1141,9 +1141,53 @@ function h(string $v): string
         sortValue(tableName, row, key) {
           if (tableName === "payments" && key === "Owers") {
             const owers = row?.Owers;
-            return Array.isArray(owers) ? owers.join(", ") : String(owers || "");
+            return Array.isArray(owers) ? owers.map((ower) => ower?.Name || "").join(", ") : String(owers || "");
           }
           return row?.[key];
+        },
+
+        formatDisplayDate(value) {
+          if (!value) return "—";
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) return String(value);
+          return date.toLocaleString();
+        },
+
+        normalizeUser(user) {
+          return {
+            ID: user?.id ?? user?.ID ?? 0,
+            Name: user?.name ?? user?.Name ?? "",
+            CreatedAt: this.formatDisplayDate(user?.createdAt ?? user?.CreatedAt),
+          };
+        },
+
+        normalizePayment(payment) {
+          const payer = payment?.payer ?? {};
+          const debtors = Array.isArray(payment?.debtors) ? payment.debtors : [];
+          const exchange = payment?.exchange ?? {};
+
+          return {
+            ID: payment?.id ?? payment?.ID ?? 0,
+            Amount: payment?.amount ?? payment?.Amount ?? 0,
+            Description: payment?.description ?? payment?.Description ?? "",
+            Date: this.formatDisplayDate(payment?.date ?? payment?.Date),
+            PayerName: payer?.name ?? payment?.PayerName ?? "",
+            Payer: payer,
+            Owers: debtors,
+            FromExchangeRate: exchange?.fromCurrency ?? payment?.FromExchangeRate ?? "",
+            ToExchangeRate: exchange?.toCurrency ?? payment?.ToExchangeRate ?? "",
+            ExchangeRate: exchange?.rate ?? payment?.ExchangeRate ?? null,
+          };
+        },
+
+        normalizeBalance(balance) {
+          return {
+            ID: balance?.id ?? balance?.ID ?? 0,
+            FromUser: balance?.owedByUser?.name ?? balance?.FromUser ?? "",
+            ToUser: balance?.owedToUser?.name ?? balance?.ToUser ?? "",
+            Amount: balance?.amount ?? balance?.Amount ?? 0,
+            Currency: balance?.currency ?? balance?.Currency ?? "",
+          };
         },
 
         getSortedRows(tableName, rows) {
@@ -1174,8 +1218,6 @@ function h(string $v): string
         },
 
         getOwers(payment) {
-          console.log("getOwers", payment.Owers);
-          // Need to grab from each Ower the .Name field
           return Array.isArray(payment?.Owers) ? payment.Owers.map((o) => o.Name).join(", ") : String(payment?.Owers || "");
         },
 
@@ -1307,20 +1349,14 @@ function h(string $v): string
 
         async loadAll(background = false) {
           try {
-            // update balances
-            await req("/api/v1/balance/all", {
-              method: "POST",
-            });
-
             const [users, payments, balancesResp] = await Promise.all([
-              req("/api/v1/user/all"),
+              req("/api/v1/user"),
               req("/api/v1/payment/all"),
-              reqWithRaw("/api/v1/balance/all")
+              reqWithRaw("/api/v1/debts")
             ]);
-            this.users    = Array.isArray(users)    ? users    : [];
-
-            this.payments = Array.isArray(payments) ? payments : [];
-            this.balances = Array.isArray(balancesResp.data) ? balancesResp.data : [];
+            this.users = Array.isArray(users) ? users.map((user) => this.normalizeUser(user)) : [];
+            this.payments = Array.isArray(payments) ? payments.map((payment) => this.normalizePayment(payment)) : [];
+            this.balances = Array.isArray(balancesResp.data) ? balancesResp.data.map((balance) => this.normalizeBalance(balance)) : [];
             this.balancesRaw = balancesResp.raw;
             this.clampAllTablePages();
             this.activePaymentRateId = null;
@@ -1346,12 +1382,15 @@ function h(string $v): string
           }
         },
 
-        async deleteUser(name) {
-          if (!name) { this.flashError("Invalid user name"); return; }
-          this.confirm(`Delete user "${name}"?`, async () => {
+        async deleteUser(user) {
+          if (!user?.ID) {
+            this.flashError("Invalid user ID");
+            return;
+          }
+          this.confirm(`Delete user "${user.Name}"?`, async () => {
             this.flashError("");
             try {
-              await req(`/api/v1/user/${encodeURIComponent(name)}`, { method: "DELETE" });
+              await req(`/api/v1/user/${user.ID}`, { method: "DELETE" });
               this.flashNotice("User deleted");
               await this.loadAll();
             } catch (e) {
@@ -1373,12 +1412,14 @@ function h(string $v): string
             await req("/api/v1/payment", {
               method: "POST",
               body: JSON.stringify({
-                amount:      Number(this.newPayment.amount),
-                payer:       this.newPayment.payer,
+                amount: Number(this.newPayment.amount),
+                date: new Date().toISOString(),
+                debtMode: "equal",
+                debtors: owers,
+                payer: this.newPayment.payer,
                 description: this.newPayment.description,
                 fromExchangeRate: this.newPayment.fromExchangeRate,
                 toExchangeRate: this.newPayment.toExchangeRate,
-                owers,
               }),
             });
             this.newPayment = { amount: "", payer: "", description: "", fromExchangeRate: "USD", toExchangeRate: "USD", owers: [] };
@@ -1408,18 +1449,7 @@ function h(string $v): string
         },
 
         async settleUp(payment, userWhosSettling) {
-          console.log(payment)
-          await req("/api/v1/payment", {
-            method: "POST",
-            body: JSON.stringify({
-              amount:      Number(payment.Amount),
-              payer:       userWhosSettling,
-              description: this.newPayment.description,
-              fromExchangeRate: this.newPayment.fromExchangeRate,
-              toExchangeRate: this.newPayment.toExchangeRate,
-              owers: [],
-            }),
-          });
+          this.flashNotice("Settle-up from the payments table is not supported by the current API.");
         },
       };
     }

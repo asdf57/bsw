@@ -2,15 +2,14 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 
+	ds "github.com/asdf57/bsw/internal/debts"
 	apimodels "github.com/asdf57/bsw/internal/models/api"
 	dbmodels "github.com/asdf57/bsw/internal/models/db"
 	"github.com/asdf57/bsw/internal/models/mappers"
 	"github.com/gin-gonic/gin"
-	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -36,7 +35,13 @@ func (h *Handlers) GetDebts(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, mappers.DebtResponsesFromDB(debts))
+	usersByID, err := h.getDebtUsersByID(debts)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "unhandled error while querying for users"})
+		return
+	}
+
+	c.JSON(http.StatusOK, mappers.DebtResponsesFromDB(debts, usersByID))
 }
 
 // GetAllUserDebts godoc
@@ -55,73 +60,49 @@ func (h *Handlers) GetAllUserDebts(c *gin.Context) {
 		return
 	}
 
-	// Get set of ids for uniqueness
-	idSet := make(map[uint]struct{})
-	for _, d := range debts {
-		idSet[d.OwedByUserId] = struct{}{}
-	}
-
-	// Store all unique ids in a list
-	ids := make([]uint, 0, len(idSet))
-	for id, _ := range idSet {
-		ids = append(ids, id)
-	}
-
-	var users []dbmodels.UserDBEntry
-	if err := h.Db.DB.Where("id IN ?", ids).Find(&users).Error; err != nil {
+	usersByID, err := h.getDebtUsersByID(debts)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "unhandled error while querying for users"})
 		return
 	}
 
-	for _, user := range users {
-		for _, debt := range debts {
-			if debt.OwedByUserId == user.ID {
-				debtsMap[user.Name] = append(debtsMap[user.Name], mappers.DebtResponseFromDB(debt))
-			}
+	for _, debt := range debts {
+		owedByUser := usersByID[ds.GetOwedByUser(debt)]
+		if owedByUser.ID == 0 {
+			continue
 		}
+
+		debtsMap[owedByUser.Name] = append(debtsMap[owedByUser.Name], mappers.DebtResponseFromDB(debt, usersByID))
 	}
 
 	c.JSON(http.StatusOK, debtsMap)
 }
 
-func (h *Handlers) AddDebt(c *gin.Context) {
-	var debt apimodels.DebtEntry
-
-	if err := c.ShouldBind(&debt); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+func (h *Handlers) getDebtUsersByID(debts []dbmodels.DebtDBEntry) (map[uint]dbmodels.UserDBEntry, error) {
+	idSet := make(map[uint]struct{})
+	for _, debt := range debts {
+		idSet[debt.UserLowId] = struct{}{}
+		idSet[debt.UserHighId] = struct{}{}
 	}
 
-	// Users cannot owe debts to themselves
-	if debt.OwedByUser == debt.OwedToUser {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("user %s cannot be indebted to themselves", debt.OwedByUser)})
-		return
+	ids := make([]uint, 0, len(idSet))
+	for id := range idSet {
+		ids = append(ids, id)
 	}
 
-	// optimization -- can probably batch all user id calls into a single query!
-	owedByUserId, err := h.Db.GetUserIdFromName(debt.OwedByUser)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("no user with name %s could be found", debt.OwedByUser)})
-		return
+	usersByID := make(map[uint]dbmodels.UserDBEntry, len(ids))
+	if len(ids) == 0 {
+		return usersByID, nil
 	}
 
-	owedToUserId, err := h.Db.GetUserIdFromName(debt.OwedToUser)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("no user with name %s could be found", debt.OwedToUser)})
-		return
+	var users []dbmodels.UserDBEntry
+	if err := h.Db.DB.Where("id IN ?", ids).Find(&users).Error; err != nil {
+		return nil, err
 	}
 
-	parsedAmount := decimal.NewFromFloat(debt.Amount)
-
-	debtEntry := dbmodels.DebtDBEntry{
-		OwedByUserId: owedByUserId,
-		OwedToUserId: owedToUserId,
-		Amount:       parsedAmount,
-		Currency:     debt.Currency, // debts are always stored in the
+	for _, user := range users {
+		usersByID[user.ID] = user
 	}
 
-	if err := h.Db.DB.Create(&debtEntry).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to create debt entry in the db: %s", err.Error())})
-		return
-	}
+	return usersByID, nil
 }

@@ -3,9 +3,12 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/asdf57/bsw/internal/currency"
+	"github.com/asdf57/bsw/internal/db"
+	"github.com/asdf57/bsw/internal/debts"
 	apimodels "github.com/asdf57/bsw/internal/models/api"
 	dbmodels "github.com/asdf57/bsw/internal/models/db"
 	"github.com/asdf57/bsw/internal/models/mappers"
@@ -82,12 +85,6 @@ func (h *Handlers) PostPayment(c *gin.Context) {
 		return
 	}
 
-	exchangeRateDbEntry, err := currency.GetExchangeRateDBEntry(payment.FromExchangeRate, payment.ToExchangeRate, payment.Date)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
 	debtors, err := h.Db.GetUsersFromNames(payment.Debtors)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to obtain debtor data from DB: %s", err.Error())})
@@ -107,16 +104,36 @@ func (h *Handlers) PostPayment(c *gin.Context) {
 	}
 
 	var paymentId uint
+	var exchangeRateDbEntry dbmodels.ExchangeDBEntry
+
+	exchangeRateKey := dbmodels.ExchangeDBEntry{
+		FromCurrency: payment.FromExchangeRate,
+		ToCurrency:   payment.ToExchangeRate,
+		Date:         currency.NormalizeExchangeDate(payment.Date),
+	}
 
 	err = h.Db.DB.Transaction(func(tx *gorm.DB) error {
-		lookupKey := dbmodels.ExchangeDBEntry{
-			FromCurrency: exchangeRateDbEntry.FromCurrency,
-			ToCurrency:   exchangeRateDbEntry.ToCurrency,
-			Date:         exchangeRateDbEntry.Date,
-		}
+		if err := tx.Where(&exchangeRateKey).First(&exchangeRateDbEntry).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				log.Printf("Caching exchange rate entry with properties: %+v", exchangeRateKey)
+				exchangeRateDbEntry, err = currency.GetExchangeRateDBEntry(payment.FromExchangeRate, payment.ToExchangeRate, payment.Date)
+				if err != nil {
+					return fmt.Errorf("failed to obtain exchange rate data")
+				}
 
-		if err := tx.Where(&lookupKey).FirstOrCreate(&exchangeRateDbEntry).Error; err != nil {
-			return fmt.Errorf("upsert exchange rate: %w", err)
+				if err := tx.Create(&exchangeRateDbEntry).Error; err != nil {
+					if db.IsUniqueConstraintError(err) {
+						// another payment already cached the entry, try re-reading instead!
+						if err := tx.Where(&exchangeRateKey).First(&exchangeRateDbEntry).Error; err != nil {
+							return fmt.Errorf("re-read of cached exchange rate entry failed")
+						}
+					} else {
+						return fmt.Errorf("failed to cache exchange rate data")
+					}
+				}
+			} else {
+				return fmt.Errorf("failed to query for exchange rate data in DB")
+			}
 		}
 
 		parsedAmount := decimal.NewFromFloat(payment.Amount)
@@ -139,12 +156,11 @@ func (h *Handlers) PostPayment(c *gin.Context) {
 		// Now create associated debts (if specified)
 		if len(payment.Debtors) > 0 {
 			if payment.DebtMode != "equal" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "payment "})
 				return fmt.Errorf("requested debt mode is either invalid or unsupported")
 			}
 
 			parsedNumDebtors := decimal.NewFromInt(int64(len(payment.Debtors)))
-			amountOwedPerDebtor := decimal.NewFromFloat(payment.Amount).Div(parsedNumDebtors)
+			amountOwedPerDebtor := decimal.NewFromFloat(payment.Amount).Div(parsedNumDebtors.Add(decimal.NewFromInt(1)))
 
 			// Users cannot owe debts to themselves -- fail fast, avoid extra DB operations!
 			for _, debtor := range payment.Debtors {
@@ -154,15 +170,14 @@ func (h *Handlers) PostPayment(c *gin.Context) {
 			}
 
 			for _, debtor := range payment.Debtors {
-				debtEntry := dbmodels.DebtDBEntry{
-					OwedByUserId: debtorIDsByName[debtor],
-					OwedToUserId: payerId,
-					Amount:       amountOwedPerDebtor,
-					Currency:     payment.ToExchangeRate,
-				}
-
-				if err := tx.Create(&debtEntry).Error; err != nil {
-					return fmt.Errorf("could not create debt entry in the db: %s", err.Error())
+				if err := debts.ApplyNetDebt(
+					tx,
+					debtorIDsByName[debtor],
+					payerId,
+					amountOwedPerDebtor,
+					payment.ToExchangeRate,
+				); err != nil {
+					return err
 				}
 			}
 		}
@@ -190,14 +205,50 @@ func (h *Handlers) PostPayment(c *gin.Context) {
 func (h *Handlers) DeletePayment(c *gin.Context) {
 	id := c.Param("id")
 
-	res := h.Db.DB.Delete(dbmodels.PaymentDBEntry{}, id)
-	if res.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to create payment: %s", res.Error.Error())})
-		return
-	}
+	var payment dbmodels.PaymentDBEntry
+	err := h.Db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Preload("Debtors").Preload("Exchange").First(&payment, id).Error; err != nil {
+			return err
+		}
 
-	if res.RowsAffected == 0 {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("payment with id %s does not exist!", id)})
+		if len(payment.Debtors) > 0 {
+			// if payment.DebtMode != "equal" {
+			// 	return fmt.Errorf("requested debt mode is either invalid or unsupported")
+			// }
+
+			parsedNumDebtors := decimal.NewFromInt(int64(len(payment.Debtors)))
+			amountOwedPerDebtor := payment.Amount.Div(parsedNumDebtors.Add(decimal.NewFromInt(1)))
+
+			for _, debtor := range payment.Debtors {
+				if err := debts.ApplyNetDebt(
+					tx,
+					payment.PayerID,
+					debtor.ID,
+					amountOwedPerDebtor,
+					payment.Exchange.ToCurrency,
+				); err != nil {
+					return err
+				}
+			}
+		}
+
+		if err := tx.Model(&payment).Association("Debtors").Clear(); err != nil {
+			return err
+		}
+
+		if err := tx.Unscoped().Delete(&payment).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to delete payment: %s", err.Error())})
 		return
 	}
 

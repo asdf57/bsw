@@ -18,6 +18,7 @@ func RegisterV1(r *gin.Engine, h *handlers.Handlers) *gin.RouterGroup {
 	users := v1.Group("/user")
 	users.GET("", h.GetUsers)
 	users.POST("", h.CreateUser)
+	users.DELETE("/:id", h.DeleteUser)
 
 	debts := v1.Group("/debts")
 	debts.GET("", h.GetDebts)
@@ -30,6 +31,7 @@ func RegisterV1(r *gin.Engine, h *handlers.Handlers) *gin.RouterGroup {
 	admin.POST("/backup", h.BackupDB)
 	admin.GET("/backup/:filename", h.GetBackup)
 	admin.GET("/exchange-rate", h.GetExchangeRate)
+	admin.GET("/exchange-rates", h.GetExchangeRatesFromDB)
 
 	return v1
 }

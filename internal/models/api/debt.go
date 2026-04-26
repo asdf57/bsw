@@ -10,11 +10,9 @@ type DebtEntry struct {
 }
 
 type DebtResponse struct {
-	ID             uint            `json:"id"`
-	OwedByUserID   uint            `json:"owedByUserId"`
-	OwedToUserID   uint            `json:"owedToUserId"`
-	OwedByUserName string          `json:"owedByUserName,omitempty"`
-	OwedToUserName string          `json:"owedToUserName,omitempty"`
-	Amount         decimal.Decimal `json:"amount"`
-	Currency       string          `json:"currency"`
+	ID         uint            `json:"id"`
+	OwedByUser UserSummary     `json:"owedByUser"`
+	OwedToUser UserSummary     `json:"owedToUser"`
+	Amount     decimal.Decimal `json:"amount"`
+	Currency   string          `json:"currency"`
 }

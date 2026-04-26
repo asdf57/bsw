@@ -61,3 +61,31 @@ func (h *Handlers) GetExchangeRate(c *gin.Context) {
 
 	c.JSON(http.StatusOK, rate)
 }
+
+// GetExchangeRatesFromDB godoc
+// @Summary Get all exchange rates stored in the DB
+// @Description Returns the exchange rates stored in the DB
+// @Tags admin
+// @Produce json
+// @Success 200 {array} api.Exchange
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/admin/exchange-rates [get]
+func (h *Handlers) GetExchangeRatesFromDB(c *gin.Context) {
+	exchangeRateDbEntries, err := h.Db.GetExchangeRatesFromDB()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to load exchange rates: %s", err.Error())})
+		return
+	}
+
+	exchangeRates := make([]apimodels.Exchange, 0, len(exchangeRateDbEntries))
+	for _, entry := range exchangeRateDbEntries {
+		exchangeRates = append(exchangeRates, apimodels.Exchange{
+			FromCurrency: entry.FromCurrency,
+			ToCurrency:   entry.ToCurrency,
+			Date:         entry.Date,
+			Rate:         entry.Rate,
+		})
+	}
+
+	c.JSON(http.StatusOK, exchangeRates)
+}

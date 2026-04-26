@@ -163,6 +163,38 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/admin/exchange-rates": {
+            "get": {
+                "description": "Returns the exchange rates stored in the DB",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get all exchange rates stored in the DB",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.Exchange"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/debts": {
             "get": {
                 "produces": [
@@ -526,6 +558,64 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/v1/user/{id}": {
+            "delete": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Delete a user by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -541,17 +631,11 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
-                "owedByUserId": {
-                    "type": "integer"
+                "owedByUser": {
+                    "$ref": "#/definitions/api.UserSummary"
                 },
-                "owedByUserName": {
-                    "type": "string"
-                },
-                "owedToUserId": {
-                    "type": "integer"
-                },
-                "owedToUserName": {
-                    "type": "string"
+                "owedToUser": {
+                    "$ref": "#/definitions/api.UserSummary"
                 }
             }
         },
