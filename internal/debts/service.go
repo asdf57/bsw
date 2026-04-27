@@ -84,7 +84,7 @@ func ApplyNetDebt(tx *gorm.DB, owedBy, owedTo uint, amount decimal.Decimal, curr
 	}
 
 	if debt.NetAmount.IsZero() {
-		if err := tx.Delete(&debt).Error; err != nil {
+		if err := tx.Unscoped().Delete(&debt).Error; err != nil {
 			return fmt.Errorf("delete zero net debt: %w", err)
 		}
 	}
