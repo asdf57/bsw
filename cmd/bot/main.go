@@ -1,15 +1,20 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
+	apimodels "github.com/asdf57/bsw/internal/models/api"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -26,10 +31,15 @@ func main() {
 	defer dg.Close()
 
 	dg.AddHandler(onMessage)
+	dg.AddHandler(onInteractionCreate)
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentMessageContent
 
 	if err := dg.Open(); err != nil {
 		log.Fatalf("failed to open discord session: %v", err)
+	}
+
+	if err := registerCommands(dg); err != nil {
+		log.Fatalf("failed to register commands: %v", err)
 	}
 
 	log.Println("discord bot is connected; waiting for shutdown signal")
@@ -63,6 +73,701 @@ func getPayments() (string, error) {
 	}
 
 	return string(body), nil
+}
+
+func getPaymentResponses() ([]apimodels.PaymentResponse, error) {
+	apiURL := strings.TrimSpace(os.Getenv("API_URL"))
+	if apiURL == "" {
+		return nil, fmt.Errorf("missing required env var: API_URL")
+	}
+
+	resp, err := http.Get(apiURL + "/api/v1/payment/all")
+	if err != nil {
+		return nil, fmt.Errorf("error making http get: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d %s", resp.StatusCode, resp.Status)
+	}
+
+	var payments []apimodels.PaymentResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payments); err != nil {
+		return nil, fmt.Errorf("error decoding payment response: %w", err)
+	}
+
+	return payments, nil
+}
+
+func getDebtResponses() ([]apimodels.DebtResponse, error) {
+	apiURL := strings.TrimSpace(os.Getenv("API_URL"))
+	if apiURL == "" {
+		return nil, fmt.Errorf("missing required env var: API_URL")
+	}
+
+	resp, err := http.Get(apiURL + "/api/v1/debts")
+	if err != nil {
+		return nil, fmt.Errorf("error making http get: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d %s", resp.StatusCode, resp.Status)
+	}
+
+	var debts []apimodels.DebtResponse
+	if err := json.NewDecoder(resp.Body).Decode(&debts); err != nil {
+		return nil, fmt.Errorf("error decoding debt response: %w", err)
+	}
+
+	return debts, nil
+}
+
+func deletePayment(paymentId uint) error {
+	apiURL := strings.TrimSpace(os.Getenv("API_URL"))
+	if apiURL == "" {
+		return fmt.Errorf("missing required env var: API_URL")
+	}
+
+	url := fmt.Sprintf("%s/api/v1/payment/%d", apiURL, paymentId)
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("error creating delete request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error performing payment deletion: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unexpected status code: %d %s: %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	return nil
+}
+
+func createPayment(payment *apimodels.Payment) error {
+	apiURL := strings.TrimSpace(os.Getenv("API_URL"))
+	if apiURL == "" {
+		return fmt.Errorf("missing required env var: API_URL")
+	}
+
+	body, err := json.Marshal(payment)
+	if err != nil {
+		return fmt.Errorf("failed to marshall payment json")
+	}
+
+	resp, err := http.Post(apiURL+"/api/v1/payment", "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		return fmt.Errorf("failed to create payment")
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unexpected status code: %d %s: %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	return nil
+}
+
+func registerCommands(s *discordgo.Session) error {
+	commands := []*discordgo.ApplicationCommand{
+		{
+			Name:        "payment",
+			Description: "Create a new payment",
+		},
+		{
+			Name:        "getpayments",
+			Description: "Show all recorded payments",
+		},
+		{
+			Name:        "getdebts",
+			Description: "Show all current debts",
+		},
+		{
+			Name:        "delpayment",
+			Description: "Delete a payment",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "id",
+					Description: "Payment ID",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "adduser",
+			Description: "Create a user",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "name",
+					Description: "User's name",
+					Required:    true,
+				},
+			},
+		},
+	}
+
+	for _, cmd := range commands {
+		if _, err := s.ApplicationCommandCreate(s.State.User.ID, "", cmd); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func openAddPaymentModal(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseModal,
+		Data: &discordgo.InteractionResponseData{
+			CustomID: "addpayment_modal",
+			Title:    "Add Payment",
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.TextInput{
+							CustomID:    "amount",
+							Label:       "Amount",
+							Style:       discordgo.TextInputShort,
+							Placeholder: "10.00",
+							Required:    true,
+						},
+					},
+				},
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.TextInput{
+							CustomID:    "payer",
+							Label:       "Payer",
+							Style:       discordgo.TextInputShort,
+							Placeholder: "bob",
+							Required:    true,
+						},
+					},
+				},
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.TextInput{
+							CustomID:    "description",
+							Label:       "Description",
+							Style:       discordgo.TextInputShort,
+							Placeholder: "Dinner",
+							Required:    true,
+						},
+					},
+				},
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.TextInput{
+							CustomID:    "debtors",
+							Label:       "Debtors (comma-separated)",
+							Style:       discordgo.TextInputParagraph,
+							Placeholder: "",
+							Required:    false,
+						},
+					},
+				},
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.TextInput{
+							CustomID:    "currency",
+							Label:       "Currency",
+							Style:       discordgo.TextInputShort,
+							Placeholder: "USD",
+							Required:    false,
+						},
+					},
+				},
+			},
+		},
+	})
+}
+
+func extractModalValues(data discordgo.ModalSubmitInteractionData) map[string]string {
+	values := make(map[string]string)
+
+	for _, row := range data.Components {
+		actionRow, ok := row.(*discordgo.ActionsRow)
+		if !ok {
+			continue
+		}
+
+		for _, comp := range actionRow.Components {
+			input, ok := comp.(*discordgo.TextInput)
+			if !ok {
+				continue
+			}
+			values[input.CustomID] = input.Value
+		}
+	}
+
+	return values
+}
+
+func splitCSV(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		v := strings.TrimSpace(p)
+		if v != "" {
+			out = append(out, v)
+		}
+	}
+
+	return out
+}
+
+func respondWithMessage(s *discordgo.Session, i *discordgo.InteractionCreate, msg string) error {
+	return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: msg,
+		},
+	})
+}
+
+func respondWithEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, embed *discordgo.MessageEmbed) error {
+	return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: []*discordgo.MessageEmbed{embed},
+		},
+	})
+}
+
+func formatPaymentAmount(payment apimodels.Payment) string {
+	currency := strings.ToUpper(strings.TrimSpace(payment.ToExchangeRate))
+	if currency == "" {
+		currency = strings.ToUpper(strings.TrimSpace(payment.FromExchangeRate))
+	}
+	if currency == "" {
+		return fmt.Sprintf("%.2f", payment.Amount)
+	}
+
+	return fmt.Sprintf("%.2f %s", payment.Amount, currency)
+}
+
+func formatDebtors(debtors []string) string {
+	if len(debtors) == 0 {
+		return ""
+	}
+
+	lines := make([]string, 0, len(debtors))
+	for _, debtor := range debtors {
+		lines = append(lines, "• "+debtor)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func paymentCreatedEmbed(payment apimodels.Payment, err error) *discordgo.MessageEmbed {
+	if err != nil {
+		return &discordgo.MessageEmbed{
+			Title:       "Payment Creation Failed",
+			Description: fmt.Sprintf("An error occurred while recording the payment:\n%s", err.Error()),
+			Color:       0xE74C3C,
+			Timestamp:   time.Now().Format(time.RFC3339),
+		}
+	}
+
+	description := strings.TrimSpace(payment.Description)
+	if description == "" {
+		description = "_none_"
+	}
+
+	return &discordgo.MessageEmbed{
+		Title:       "Payment Created",
+		Description: "The payment was recorded successfully.",
+		Color:       0x2ECC71,
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:   "Amount",
+				Value:  "`" + formatPaymentAmount(payment) + "`",
+				Inline: true,
+			},
+			{
+				Name:   "Payer",
+				Value:  payment.Payer,
+				Inline: true,
+			},
+			{
+				Name:   "Debtors",
+				Value:  formatDebtors(payment.Debtors),
+				Inline: false,
+			},
+			{
+				Name:   "Description",
+				Value:  description,
+				Inline: false,
+			},
+		},
+		Timestamp: time.Now().Format(time.RFC3339),
+	}
+}
+
+func formatPaymentResponseAmount(payment apimodels.PaymentResponse) string {
+	fromCurrency := strings.ToUpper(strings.TrimSpace(payment.Exchange.FromCurrency))
+	toCurrency := strings.ToUpper(strings.TrimSpace(payment.Exchange.ToCurrency))
+	amount := payment.Amount.StringFixed(2)
+
+	if toCurrency == "" && fromCurrency == "" {
+		return amount
+	}
+
+	if toCurrency == "" || toCurrency == fromCurrency {
+		return fmt.Sprintf("%s %s", amount, fromCurrency)
+	}
+
+	return fmt.Sprintf("%s %s -> %s", amount, fromCurrency, toCurrency)
+}
+
+func formatPaymentResponseDebtors(debtors []apimodels.UserSummary) string {
+	if len(debtors) == 0 {
+		return ""
+	}
+
+	names := make([]string, 0, len(debtors))
+	for _, debtor := range debtors {
+		names = append(names, debtor.Name)
+	}
+
+	return strings.Join(names, ", ")
+}
+
+func paymentFieldValue(payment apimodels.PaymentResponse) string {
+	lines := []string{
+		fmt.Sprintf("**Payer:** %s", payment.Payer.Name),
+		fmt.Sprintf("**Debtors:** %s", formatPaymentResponseDebtors(payment.Debtors)),
+		fmt.Sprintf("**Date:** %s", payment.Date.Local().Format("2006-01-02 15:04")),
+	}
+
+	description := strings.TrimSpace(payment.Description)
+	if description != "" {
+		lines = append(lines, fmt.Sprintf("**Description:** %s", description))
+	}
+
+	if payment.Exchange.FromCurrency != "" && payment.Exchange.ToCurrency != "" && payment.Exchange.FromCurrency != payment.Exchange.ToCurrency {
+		lines = append(lines, fmt.Sprintf("**Rate:** 1 %s = %.6f %s", payment.Exchange.FromCurrency, payment.Exchange.Rate, payment.Exchange.ToCurrency))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func truncateCell(value string, width int) string {
+	runes := []rune(value)
+	if len(runes) <= width {
+		return value
+	}
+	if width <= 1 {
+		return string(runes[:width])
+	}
+	return string(runes[:width-1]) + "…"
+}
+
+func padCell(value string, width int) string {
+	return fmt.Sprintf("%-*s", width, truncateCell(value, width))
+}
+
+func paymentListTable(payments []apimodels.PaymentResponse) string {
+	if len(payments) == 0 {
+		return "No payments have been recorded yet."
+	}
+
+	const (
+		idWidth          = 4
+		payerWidth       = 12
+		debtorsWidth     = 22
+		amountWidth      = 16
+		dateWidth        = 16
+		descriptionWidth = 24
+		maxRows          = 12
+	)
+
+	lines := []string{
+		fmt.Sprintf(
+			"%s  %s  %s  %s  %s  %s",
+			padCell("ID", idWidth),
+			padCell("PAYER", payerWidth),
+			padCell("DEBTORS", debtorsWidth),
+			padCell("AMOUNT", amountWidth),
+			padCell("DATE", dateWidth),
+			padCell("DESCRIPTION", descriptionWidth),
+		),
+		fmt.Sprintf(
+			"%s  %s  %s  %s  %s  %s",
+			strings.Repeat("-", idWidth),
+			strings.Repeat("-", payerWidth),
+			strings.Repeat("-", debtorsWidth),
+			strings.Repeat("-", amountWidth),
+			strings.Repeat("-", dateWidth),
+			strings.Repeat("-", descriptionWidth),
+		),
+	}
+
+	limit := min(len(payments), maxRows)
+
+	for _, payment := range payments[:limit] {
+		dateValue := payment.Date.Local().Format("2006-01-02 15:04")
+		description := payment.Description
+		if strings.TrimSpace(description) == "" {
+			description = "-"
+		}
+
+		lines = append(lines, fmt.Sprintf(
+			"%s  %s  %s  %s  %s  %s",
+			padCell(strconv.FormatUint(uint64(payment.ID), 10), idWidth),
+			padCell(payment.Payer.Name, payerWidth),
+			padCell(formatPaymentResponseDebtors(payment.Debtors), debtorsWidth),
+			padCell(formatPaymentResponseAmount(payment), amountWidth),
+			padCell(dateValue, dateWidth),
+			padCell(description, descriptionWidth),
+		))
+	}
+
+	if len(payments) > maxRows {
+		lines = append(lines, "")
+		lines = append(lines, fmt.Sprintf("Showing first %d of %d payments.", maxRows, len(payments)))
+	}
+
+	return "```text\n" + strings.Join(lines, "\n") + "\n```"
+}
+
+func debtListMessage(debts []apimodels.DebtResponse) string {
+	if len(debts) == 0 {
+		return "**Debts**\nAll settled up."
+	}
+
+	const maxRows = 20
+
+	lines := []string{"**Debts**"}
+	limit := min(len(debts), maxRows)
+
+	for _, debt := range debts[:limit] {
+		lines = append(lines, fmt.Sprintf(
+			"• **%s -> %s:** `%s %s`",
+			debt.OwedByUser.Name,
+			debt.OwedToUser.Name,
+			debt.Amount.StringFixed(2),
+			strings.ToUpper(strings.TrimSpace(debt.Currency)),
+		))
+	}
+
+	if len(debts) > maxRows {
+		lines = append(lines, "")
+		lines = append(lines, fmt.Sprintf("_Showing first %d of %d debts._", maxRows, len(debts)))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func handleAddPaymentModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	values := extractModalValues(i.ModalSubmitData())
+
+	amount, err := strconv.ParseFloat(strings.TrimSpace(values["amount"]), 64)
+	if err != nil {
+		return respondWithMessage(s, i, fmt.Sprintf("invalid amount: %s", err.Error()))
+	}
+
+	debtors := splitCSV(values["debtors"])
+
+	req := apimodels.Payment{
+		Amount:           amount,
+		Payer:            strings.TrimSpace(values["payer"]),
+		Description:      strings.TrimSpace(values["description"]),
+		Date:             time.Now().UTC(),
+		FromExchangeRate: strings.ToUpper(strings.TrimSpace(values["currency"])),
+		ToExchangeRate:   "USD",
+		Debtors:          debtors,
+		DebtMode:         "equal",
+	}
+
+	if err := createPayment(&req); err != nil {
+		return respondWithEmbed(s, i, paymentCreatedEmbed(req, err))
+	}
+
+	return respondWithEmbed(s, i, paymentCreatedEmbed(req, nil))
+}
+
+func handleGetPayments(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	payments, err := getPaymentResponses()
+	if err != nil {
+		return respondWithMessage(s, i, "fetch payments failed: "+err.Error())
+	}
+
+	return respondWithMessage(s, i, paymentListTable(payments))
+}
+
+func handleGetDebts(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	debts, err := getDebtResponses()
+	if err != nil {
+		return respondWithMessage(s, i, "fetch debts failed: "+err.Error())
+	}
+
+	return respondWithMessage(s, i, debtListMessage(debts))
+}
+
+func paymentDeleteEmbed(paymentId uint, err error) *discordgo.MessageEmbed {
+	if err != nil {
+		return &discordgo.MessageEmbed{
+			Title:       "Payment Deletion Failed",
+			Description: fmt.Sprintf("An error occurred while recording the payment:\n%s", err.Error()),
+			Color:       0xE74C3C,
+			Timestamp:   time.Now().Format(time.RFC3339),
+		}
+	}
+
+	return &discordgo.MessageEmbed{
+		Title:       "Payment Deleted",
+		Description: "The payment was deleted successfully.",
+		Color:       0x2ECC71,
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:   "Id",
+				Value:  "`" + strconv.FormatUint(uint64(paymentId), 10) + "`",
+				Inline: true,
+			},
+		},
+		Timestamp: time.Now().Format(time.RFC3339),
+	}
+}
+
+func handleDeletePayment(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	data := i.ApplicationCommandData()
+	var paymentID int64
+	for _, opt := range data.Options {
+		if opt.Name == "id" {
+			paymentID = opt.IntValue()
+			break
+		}
+	}
+
+	coercedPaymentId := uint(paymentID)
+
+	// Do the deletion
+	err := deletePayment(coercedPaymentId)
+	embed := paymentDeleteEmbed(coercedPaymentId, err)
+
+	return respondWithEmbed(s, i, embed)
+}
+
+func createUser(username string) error {
+	apiURL := strings.TrimSpace(os.Getenv("API_URL"))
+	if apiURL == "" {
+		return fmt.Errorf("missing required env var: API_URL")
+	}
+
+	url := fmt.Sprintf("%s/api/v1/user", apiURL)
+
+	apiPayload := apimodels.User{
+		Name: username,
+	}
+
+	marshaledJson, err := json.Marshal(apiPayload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal user payload: %w", err)
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(marshaledJson))
+	if err != nil {
+		return fmt.Errorf("failed to create user: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unexpected status code: %d %s: %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	return nil
+}
+
+func createUserEmbed(username string, err error) *discordgo.MessageEmbed {
+	if err != nil {
+		return &discordgo.MessageEmbed{
+			Title:       "User Creation Failed",
+			Description: fmt.Sprintf("An error occurred while creating the user:\n%s", err.Error()),
+			Color:       0xE74C3C,
+			Timestamp:   time.Now().Format(time.RFC3339),
+		}
+	}
+
+	return &discordgo.MessageEmbed{
+		Title:       "User Created",
+		Description: "The user was created successfully.",
+		Color:       0x2ECC71,
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:   "User",
+				Value:  "`" + username + "`",
+				Inline: true,
+			},
+		},
+		Timestamp: time.Now().Format(time.RFC3339),
+	}
+}
+
+func handleCreateUser(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	data := i.ApplicationCommandData()
+	var username string
+	for _, opt := range data.Options {
+		if opt.Name == "name" {
+			username = opt.StringValue()
+			break
+		}
+	}
+
+	err := createUser(username)
+	embed := createUserEmbed(username, err)
+
+	return respondWithEmbed(s, i, embed)
+}
+
+func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	switch i.Type {
+	case discordgo.InteractionApplicationCommand:
+		data := i.ApplicationCommandData()
+		if data.Name == "payment" {
+			if err := openAddPaymentModal(s, i); err != nil {
+				log.Printf("open modal failed: %v", err)
+			}
+		}
+		if data.Name == "getpayments" {
+			if err := handleGetPayments(s, i); err != nil {
+				log.Printf("getpayments failed: %v", err)
+			}
+		}
+		if data.Name == "getdebts" {
+			if err := handleGetDebts(s, i); err != nil {
+				log.Printf("getdebts failed: %v", err)
+			}
+		}
+		if data.Name == "delpayment" {
+			if err := handleDeletePayment(s, i); err != nil {
+				log.Printf("delpayment failed: %v", err)
+			}
+		}
+		if data.Name == "adduser" {
+			if err := handleCreateUser(s, i); err != nil {
+				log.Printf("adduser failed: %v", err)
+			}
+		}
+
+	case discordgo.InteractionModalSubmit:
+		data := i.ModalSubmitData()
+		if data.CustomID == "addpayment_modal" {
+			if err := handleAddPaymentModalSubmit(s, i); err != nil {
+				log.Printf("modal submit failed: %v", err)
+			}
+		}
+	}
 }
 
 func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
