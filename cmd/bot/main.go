@@ -213,6 +213,18 @@ func registerCommands(s *discordgo.Session) error {
 				},
 			},
 		},
+		{
+			Name:        "settle",
+			Description: "Settle up",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "name",
+					Description: "User who is settling up",
+					Required:    true,
+				},
+			},
+		},
 	}
 
 	for _, cmd := range commands {
@@ -343,6 +355,16 @@ func respondWithEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, embe
 	})
 }
 
+func stringPtr(value string) *string {
+	return &value
+}
+
+func respondDeferred(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	})
+}
+
 func formatPaymentAmount(payment apimodels.Payment) string {
 	currency := strings.ToUpper(strings.TrimSpace(payment.ToExchangeRate))
 	if currency == "" {
@@ -459,6 +481,97 @@ func paymentFieldValue(payment apimodels.PaymentResponse) string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func paymentThreadEmbed(payment apimodels.PaymentResponse) *discordgo.MessageEmbed {
+	description := strings.TrimSpace(payment.Description)
+	if description == "" {
+		description = "_none_"
+	}
+
+	fields := []*discordgo.MessageEmbedField{
+		{
+			Name:   "Payer",
+			Value:  payment.Payer.Name,
+			Inline: true,
+		},
+		{
+			Name:   "Date",
+			Value:  payment.Date.Local().Format("2006-01-02 15:04"),
+			Inline: true,
+		},
+		{
+			Name:   "Debtors",
+			Value:  formatPaymentResponseDebtors(payment.Debtors),
+			Inline: false,
+		},
+		{
+			Name:   "Description",
+			Value:  description,
+			Inline: false,
+		},
+	}
+
+	if payment.Exchange.FromCurrency != "" && payment.Exchange.ToCurrency != "" && payment.Exchange.FromCurrency != payment.Exchange.ToCurrency {
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   "Exchange Rate",
+			Value:  fmt.Sprintf("1 %s = %.6f %s", payment.Exchange.FromCurrency, payment.Exchange.Rate, payment.Exchange.ToCurrency),
+			Inline: false,
+		})
+	}
+
+	return &discordgo.MessageEmbed{
+		Title:     fmt.Sprintf("#%d • %s", payment.ID, formatPaymentResponseAmount(payment)),
+		Color:     0x3B82F6,
+		Fields:    fields,
+		Timestamp: payment.Date.Format(time.RFC3339),
+	}
+}
+
+func createPaymentsThread(s *discordgo.Session, channelID string, payments []apimodels.PaymentResponse) (*discordgo.Channel, error) {
+	thread, err := s.ThreadStart(channelID, "Payments", discordgo.ChannelTypeGuildPublicThread, 1440)
+	if err != nil {
+		return nil, fmt.Errorf("start payments thread: %w", err)
+	}
+
+	messages, err := s.ChannelMessages(channelID, 10, "", "", "")
+	if err != nil {
+		return nil, err
+	}
+
+	for _, msg := range messages {
+		if msg.Type == discordgo.MessageTypeThreadCreated {
+			if err := s.ChannelMessageDelete(channelID, msg.ID); err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		if msg.Author != nil &&
+			msg.Author.ID == s.State.User.ID &&
+			strings.HasPrefix(msg.Content, "Posted ") &&
+			strings.Contains(msg.Content, " payments in ") {
+			if err := s.ChannelMessageDelete(channelID, msg.ID); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if len(payments) == 0 {
+		if _, err := s.ChannelMessageSend(thread.ID, "No payments have been recorded yet."); err != nil {
+			return nil, fmt.Errorf("post empty payments message: %w", err)
+		}
+
+		return thread, nil
+	}
+
+	for _, payment := range payments {
+		if _, err := s.ChannelMessageSendEmbed(thread.ID, paymentThreadEmbed(payment)); err != nil {
+			return nil, fmt.Errorf("post payment %d to thread: %w", payment.ID, err)
+		}
+	}
+
+	return thread, nil
 }
 
 func truncateCell(value string, width int) string {
@@ -597,12 +710,65 @@ func handleAddPaymentModalSubmit(s *discordgo.Session, i *discordgo.InteractionC
 }
 
 func handleGetPayments(s *discordgo.Session, i *discordgo.InteractionCreate) error {
-	payments, err := getPaymentResponses()
-	if err != nil {
-		return respondWithMessage(s, i, "fetch payments failed: "+err.Error())
+	if err := respondDeferred(s, i); err != nil {
+		return fmt.Errorf("defer getpayments response: %w", err)
 	}
 
-	return respondWithMessage(s, i, paymentListTable(payments))
+	payments, err := getPaymentResponses()
+	if err != nil {
+		_, editErr := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: stringPtr("fetch payments failed: " + err.Error()),
+		})
+		if editErr != nil {
+			return fmt.Errorf("fetch payments failed: %w; edit response failed: %w", err, editErr)
+		}
+		return nil
+	}
+
+	// Clear prev threads
+	threads, err := s.ThreadsActive(i.ChannelID)
+	if err != nil {
+		return fmt.Errorf("obtain previous payment threads")
+	}
+
+	for _, thread := range threads.Threads {
+		if thread.ParentID != i.ChannelID {
+			continue
+		}
+
+		if thread.Name != "Payments" {
+			continue
+		}
+
+		if _, err := s.ChannelDelete(thread.ID); err != nil {
+			return fmt.Errorf("delete thread %s: %w", thread.ID, err)
+		}
+	}
+
+	thread, err := createPaymentsThread(s, i.ChannelID, payments)
+	if err != nil {
+		_, editErr := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: stringPtr("build payments thread failed: " + err.Error()),
+		})
+		if editErr != nil {
+			return fmt.Errorf("build payments thread failed: %w; edit response failed: %w", err, editErr)
+		}
+		return nil
+	}
+
+	content := fmt.Sprintf("Posted %d payments in <#%s>.", len(payments), thread.ID)
+	if len(payments) == 0 {
+		content = fmt.Sprintf("Created <#%s>. No payments have been recorded yet.", thread.ID)
+	}
+
+	_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+		Content: stringPtr(content),
+	})
+	if err != nil {
+		return fmt.Errorf("edit getpayments response: %w", err)
+	}
+
+	return nil
 }
 
 func handleGetDebts(s *discordgo.Session, i *discordgo.InteractionCreate) error {
@@ -714,6 +880,31 @@ func createUserEmbed(username string, err error) *discordgo.MessageEmbed {
 	}
 }
 
+func createSettleUpEmbed(username string, err error) *discordgo.MessageEmbed {
+	if err != nil {
+		return &discordgo.MessageEmbed{
+			Title:       "Settle Up Failed",
+			Description: fmt.Sprintf("An error occurred while settling up for user:\n%s", err.Error()),
+			Color:       0xE74C3C,
+			Timestamp:   time.Now().Format(time.RFC3339),
+		}
+	}
+
+	return &discordgo.MessageEmbed{
+		Title:       "Settled Up",
+		Description: "You're all settled up!",
+		Color:       0x2ECC71,
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:   "User",
+				Value:  "`" + username + "`",
+				Inline: true,
+			},
+		},
+		Timestamp: time.Now().Format(time.RFC3339),
+	}
+}
+
 func handleCreateUser(s *discordgo.Session, i *discordgo.InteractionCreate) error {
 	data := i.ApplicationCommandData()
 	var username string
@@ -728,6 +919,34 @@ func handleCreateUser(s *discordgo.Session, i *discordgo.InteractionCreate) erro
 	embed := createUserEmbed(username, err)
 
 	return respondWithEmbed(s, i, embed)
+}
+
+func settleUp(username string) error {
+	return nil
+}
+
+func handleSettle(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	data := i.ApplicationCommandData()
+	var username string
+	for _, opt := range data.Options {
+		if opt.Name == "name" {
+			username = opt.StringValue()
+			break
+		}
+	}
+
+	err := settleUp(username)
+	embed := createSettleUpEmbed(username, err)
+
+	if err := respondWithEmbed(s, i, embed); err != nil {
+		return err
+	}
+
+	// So proud of you
+	s.ChannelMessageSend(i.ChannelID, "So proud of you!")
+	s.ChannelMessageSend(i.ChannelID, "https://tenor.com/iYkARYAbfTg.gif")
+
+	return nil
 }
 
 func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -757,6 +976,11 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if data.Name == "adduser" {
 			if err := handleCreateUser(s, i); err != nil {
 				log.Printf("adduser failed: %v", err)
+			}
+		}
+		if data.Name == "settle" {
+			if err := handleSettle(s, i); err != nil {
+				log.Printf("settle failed: %v", err)
 			}
 		}
 
