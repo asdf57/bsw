@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"os/signal"
@@ -944,7 +945,23 @@ func handleSettle(s *discordgo.Session, i *discordgo.InteractionCreate) error {
 
 	// So proud of you
 	s.ChannelMessageSend(i.ChannelID, "So proud of you!")
-	s.ChannelMessageSend(i.ChannelID, "https://tenor.com/iYkARYAbfTg.gif")
+
+	num := rand.IntN(6)
+
+	switch num {
+	case 0:
+		s.ChannelMessageSend(i.ChannelID, "https://tenor.com/iYkARYAbfTg.gif")
+	case 1:
+		s.ChannelMessageSend(i.ChannelID, "https://tenor.com/view/frieren-pat-frieren-pat-pat-frieren-pat-pat-gif-16450085803075970062")
+	case 2:
+		s.ChannelMessageSend(i.ChannelID, "https://tenor.com/view/anime-head-pat-anime-gif-6292920416547557855")
+	case 3:
+		s.ChannelMessageSend(i.ChannelID, "https://tenor.com/view/frieren-pats-heither's-head-sousou-no-frieren-headpat-frieren-heither-gif-9445174606794519653")
+	case 4:
+		s.ChannelMessageSend(i.ChannelID, "https://tenor.com/view/frieren-headpat-sein-rooftop-praise-sousou-no-frieren-patpatpat-gif-18014250646250877804")
+	case 5:
+		s.ChannelMessageSend(i.ChannelID, "https://tenor.com/view/frieren-crying-frieren-crying-gif-199542684162590099")
+	}
 
 	return nil
 }
