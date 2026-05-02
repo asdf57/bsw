@@ -19,6 +19,10 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+const (
+	defaultPaymentCurrency = "USD"
+)
+
 func main() {
 	token := strings.TrimSpace(os.Getenv("DISCORD_BOT_TOKEN"))
 	if token == "" {
@@ -98,6 +102,30 @@ func getPaymentResponses() ([]apimodels.PaymentResponse, error) {
 	}
 
 	return payments, nil
+}
+
+func getUsers() ([]apimodels.UserSummary, error) {
+	apiURL := strings.TrimSpace(os.Getenv("API_URL"))
+	if apiURL == "" {
+		return nil, fmt.Errorf("missing required env var: API_URL")
+	}
+
+	resp, err := http.Get(apiURL + "/api/v1/user")
+	if err != nil {
+		return nil, fmt.Errorf("error making http get: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d %s", resp.StatusCode, resp.Status)
+	}
+
+	var users []apimodels.UserSummary
+	if err := json.NewDecoder(resp.Body).Decode(&users); err != nil {
+		return nil, fmt.Errorf("error decoding payment response: %w", err)
+	}
+
+	return users, nil
 }
 
 func getDebtResponses() ([]apimodels.DebtResponse, error) {
@@ -237,66 +265,97 @@ func registerCommands(s *discordgo.Session) error {
 	return nil
 }
 
+func normalizePaymentCurrency(currency string) string {
+	cleaned := strings.ToUpper(strings.TrimSpace(currency))
+	if cleaned == "" {
+		cleaned = defaultPaymentCurrency
+	}
+
+	return cleaned
+}
+
 func openAddPaymentModal(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	required := true
+	minValues := 1
+
+	// Get all users
+	users, err := getUsers()
+	if err != nil {
+		return fmt.Errorf("Failed to fetch users!")
+	}
+
+	// Extract users
+	allUsers := make([]discordgo.SelectMenuOption, 0, len(users))
+	for _, u := range users {
+		name := strings.TrimSpace(u.Name)
+		if name == "" {
+			continue
+		}
+		allUsers = append(allUsers, discordgo.SelectMenuOption{Label: name, Value: name})
+	}
+
 	return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseModal,
 		Data: &discordgo.InteractionResponseData{
 			CustomID: "addpayment_modal",
 			Title:    "Add Payment",
 			Components: []discordgo.MessageComponent{
-				discordgo.ActionsRow{
-					Components: []discordgo.MessageComponent{
-						discordgo.TextInput{
-							CustomID:    "amount",
-							Label:       "Amount",
-							Style:       discordgo.TextInputShort,
-							Placeholder: "10.00",
-							Required:    true,
+				discordgo.Label{
+					Label: "Amount",
+					Component: discordgo.TextInput{
+						CustomID:    "amount",
+						Style:       discordgo.TextInputShort,
+						Placeholder: "10.00",
+						Required:    &required,
+					},
+				},
+				discordgo.Label{
+					Label: "Payer",
+					Component: discordgo.SelectMenu{
+						CustomID:    "payer",
+						Placeholder: "Select payer",
+						MinValues:   &minValues,
+						MaxValues:   1,
+						Required:    &required,
+						Options:     allUsers,
+					},
+				},
+				discordgo.Label{
+					Label: "Description",
+					Component: discordgo.TextInput{
+						CustomID:    "description",
+						Style:       discordgo.TextInputShort,
+						Placeholder: "Dinner",
+						Required:    &required,
+					},
+				},
+				discordgo.Label{
+					Label:       "Currency",
+					Description: "Choose the payment currency.",
+					Component: discordgo.SelectMenu{
+						MenuType:    discordgo.StringSelectMenu,
+						CustomID:    "currency",
+						Placeholder: "Select a currency",
+						MaxValues:   1,
+						Required:    &required,
+						Options: []discordgo.SelectMenuOption{
+							{Label: "USD", Value: "USD", Default: true},
+							{Label: "EUR", Value: "EUR"},
+							{Label: "GBP", Value: "GBP"},
+							{Label: "CAD", Value: "CAD"},
+							{Label: "JPY", Value: "JPY"},
 						},
 					},
 				},
-				discordgo.ActionsRow{
-					Components: []discordgo.MessageComponent{
-						discordgo.TextInput{
-							CustomID:    "payer",
-							Label:       "Payer",
-							Style:       discordgo.TextInputShort,
-							Placeholder: "bob",
-							Required:    true,
-						},
-					},
-				},
-				discordgo.ActionsRow{
-					Components: []discordgo.MessageComponent{
-						discordgo.TextInput{
-							CustomID:    "description",
-							Label:       "Description",
-							Style:       discordgo.TextInputShort,
-							Placeholder: "Dinner",
-							Required:    true,
-						},
-					},
-				},
-				discordgo.ActionsRow{
-					Components: []discordgo.MessageComponent{
-						discordgo.TextInput{
-							CustomID:    "debtors",
-							Label:       "Debtors (comma-separated)",
-							Style:       discordgo.TextInputParagraph,
-							Placeholder: "",
-							Required:    false,
-						},
-					},
-				},
-				discordgo.ActionsRow{
-					Components: []discordgo.MessageComponent{
-						discordgo.TextInput{
-							CustomID:    "currency",
-							Label:       "Currency",
-							Style:       discordgo.TextInputShort,
-							Placeholder: "USD",
-							Required:    false,
-						},
+				discordgo.Label{
+					Label: "Debtors",
+					Component: discordgo.SelectMenu{
+						CustomID:    "debtors",
+						Placeholder: "Select debtors",
+						MinValues:   &minValues,
+						MaxValues:   len(allUsers),
+						Required:    &required,
+						Options:     allUsers,
 					},
 				},
 			},
@@ -307,18 +366,26 @@ func openAddPaymentModal(s *discordgo.Session, i *discordgo.InteractionCreate) e
 func extractModalValues(data discordgo.ModalSubmitInteractionData) map[string]string {
 	values := make(map[string]string)
 
-	for _, row := range data.Components {
-		actionRow, ok := row.(*discordgo.ActionsRow)
-		if !ok {
-			continue
-		}
-
-		for _, comp := range actionRow.Components {
-			input, ok := comp.(*discordgo.TextInput)
-			if !ok {
-				continue
+	for _, comp := range data.Components {
+		switch component := comp.(type) {
+		case *discordgo.Label:
+			switch child := component.Component.(type) {
+			case *discordgo.TextInput:
+				values[child.CustomID] = child.Value
+			case *discordgo.SelectMenu:
+				if len(child.Values) > 0 {
+					values[child.CustomID] = strings.Join(child.Values, ",")
+				}
 			}
-			values[input.CustomID] = input.Value
+		case *discordgo.ActionsRow:
+			for _, rowComp := range component.Components {
+				if input, ok := rowComp.(*discordgo.TextInput); ok {
+					values[input.CustomID] = input.Value
+				}
+				if selectMenu, ok := rowComp.(*discordgo.SelectMenu); ok && len(selectMenu.Values) > 0 {
+					values[selectMenu.CustomID] = strings.Join(selectMenu.Values, ",")
+				}
+			}
 		}
 	}
 
@@ -684,6 +751,7 @@ func debtListMessage(debts []apimodels.DebtResponse) string {
 
 func handleAddPaymentModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) error {
 	values := extractModalValues(i.ModalSubmitData())
+	currency := normalizePaymentCurrency(values["currency"])
 
 	amount, err := strconv.ParseFloat(strings.TrimSpace(values["amount"]), 64)
 	if err != nil {
@@ -697,7 +765,7 @@ func handleAddPaymentModalSubmit(s *discordgo.Session, i *discordgo.InteractionC
 		Payer:            strings.TrimSpace(values["payer"]),
 		Description:      strings.TrimSpace(values["description"]),
 		Date:             time.Now().UTC(),
-		FromExchangeRate: strings.ToUpper(strings.TrimSpace(values["currency"])),
+		FromExchangeRate: currency,
 		ToExchangeRate:   "USD",
 		Debtors:          debtors,
 		DebtMode:         "equal",
