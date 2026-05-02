@@ -237,7 +237,7 @@ paths:
       summary: Fetch all debts as From-To user debt pairs
       tags:
       - debts
-  /api/v1/debts/debts/users:
+  /api/v1/debts/users:
     get:
       produces:
       - application/json
