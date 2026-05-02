@@ -235,7 +235,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/debts/debts/users": {
+        "/api/v1/debts/users": {
             "get": {
                 "produces": [
                     "application/json"
