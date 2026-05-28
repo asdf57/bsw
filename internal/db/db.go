@@ -30,13 +30,55 @@ func NewBswDB() *BswDB {
 	if err := db.AutoMigrate(
 		&dbmodels.UserDBEntry{},
 		&dbmodels.ExchangeDBEntry{},
+		&dbmodels.TagDBEntry{},
 		&dbmodels.PaymentDBEntry{},
 		&dbmodels.DebtDBEntry{},
+		&dbmodels.SettlementDBEntry{},
 	); err != nil {
 		log.Fatalf("auto-migrate failed: %v", err)
 	}
 
+	if err := ensurePaymentTagDefaults(db); err != nil {
+		log.Fatalf("payment tag initialization failed: %v", err)
+	}
+
 	return &BswDB{DB: db}
+}
+
+func ensurePaymentTagDefaults(db *gorm.DB) error {
+	if err := db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_tags_name
+		ON tags (name)
+	`).Error; err != nil {
+		return fmt.Errorf("ensure tag name index: %w", err)
+	}
+
+	if err := db.Exec(`
+		INSERT INTO tags (name, created_at, updated_at)
+		VALUES ('general', NOW(), NOW())
+		ON CONFLICT (name) DO NOTHING
+	`).Error; err != nil {
+		return fmt.Errorf("ensure general tag: %w", err)
+	}
+
+	if err := db.Exec(`
+		INSERT INTO payment_tags (payment_db_entry_id, tag_db_entry_id)
+		SELECT payments.id, tags.id
+		FROM payments
+		CROSS JOIN tags
+		WHERE tags.name = 'general'
+			AND payments.deleted_at IS NULL
+			AND NOT EXISTS (
+				SELECT 1
+				FROM payment_tags
+				WHERE payment_tags.payment_db_entry_id = payments.id
+			)
+		ON CONFLICT DO NOTHING
+	`).Error; err != nil {
+		return fmt.Errorf("ensure existing payment tags: %w", err)
+	}
+
+	return nil
 }
 
 func (b *BswDB) GetUserFromName(name string) (*dbmodels.UserDBEntry, error) {

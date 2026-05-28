@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/asdf57/bsw/internal/currency"
@@ -24,14 +23,16 @@ import (
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/admin/exchange-rate [get]
 func (h *Handlers) GetExchangeRate(c *gin.Context) {
-	fromCurrency := strings.ToUpper(c.Query("from"))
-	toCurrency := strings.ToUpper(c.Query("to"))
+	rawFromCurrency := c.Query("from")
+	rawToCurrency := c.Query("to")
 	dateQuery := c.Query("date")
 
-	if fromCurrency == "" || toCurrency == "" {
+	if rawFromCurrency == "" || rawToCurrency == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing from or to query parameter"})
 		return
 	}
+	fromCurrency := currency.NormalizeCurrencyCode(rawFromCurrency)
+	toCurrency := currency.NormalizeCurrencyCode(rawToCurrency)
 
 	at := time.Now().UTC()
 	if dateQuery != "" {
@@ -43,23 +44,22 @@ func (h *Handlers) GetExchangeRate(c *gin.Context) {
 		at = parsedDate
 	}
 
-	if fromCurrency == toCurrency {
-		c.JSON(http.StatusOK, apimodels.Exchange{
-			FromCurrency: fromCurrency,
-			ToCurrency:   toCurrency,
-			Rate:         1.0,
-			Date:         at,
-		})
-		return
-	}
-
-	rate, err := currency.GetExchangeRate(fromCurrency, toCurrency, at)
+	rate, err := currency.CacheExchangeRate(h.Db.DB, apimodels.Exchange{
+		FromCurrency: fromCurrency,
+		ToCurrency:   toCurrency,
+		Date:         at,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to fetch exchange rate: %s", err.Error())})
 		return
 	}
 
-	c.JSON(http.StatusOK, rate)
+	c.JSON(http.StatusOK, apimodels.Exchange{
+		FromCurrency: rate.FromCurrency,
+		ToCurrency:   rate.ToCurrency,
+		Rate:         rate.Rate,
+		Date:         rate.Date,
+	})
 }
 
 // GetExchangeRatesFromDB godoc

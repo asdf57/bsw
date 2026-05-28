@@ -13,7 +13,8 @@ func PaymentResponseFromDB(payment dbmodels.PaymentDBEntry) apimodels.PaymentRes
 		Date:        payment.Date,
 		Payer:       UserSummaryFromDB(payment.Payer),
 		Debtors:     UserSummariesFromDB(payment.Debtors),
-		Exchange:    ExchangeSummaryFromDB(payment.Exchange),
+		Currency:    payment.Currency,
+		Tags:        TagsFromDB(payment.Tags),
 	}
 }
 
@@ -24,4 +25,12 @@ func PaymentResponsesFromDB(payments []dbmodels.PaymentDBEntry) []apimodels.Paym
 	}
 
 	return responses
+}
+
+func TagsFromDB(tags []dbmodels.TagDBEntry) []string {
+	out := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		out = append(out, tag.Name)
+	}
+	return out
 }

@@ -7,8 +7,9 @@ import (
 
 func UserSummaryFromDB(user dbmodels.UserDBEntry) apimodels.UserSummary {
 	return apimodels.UserSummary{
-		ID:   user.ID,
-		Name: user.Name,
+		ID:            user.ID,
+		Name:          user.Name,
+		DiscordHandle: user.DiscordHandle,
 	}
 }
 

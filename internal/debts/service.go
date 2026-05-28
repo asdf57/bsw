@@ -25,6 +25,18 @@ func GetOwedByUser(debt dbmodels.DebtDBEntry) uint {
 	return debt.UserLowId
 }
 
+func GetOwedToUser(debt dbmodels.DebtDBEntry) uint {
+	if debt.NetAmount.IsNegative() {
+		return debt.UserLowId
+	}
+
+	return debt.UserHighId
+}
+
+func UserOwesDebt(debt dbmodels.DebtDBEntry, userID uint) bool {
+	return GetOwedByUser(debt) == userID
+}
+
 // Returns the canonical pair and delta amount
 func signedDelta(owedBy, owedTo uint, amount decimal.Decimal) (low, high uint, delta decimal.Decimal, err error) {
 	if owedBy == owedTo {
@@ -90,4 +102,50 @@ func ApplyNetDebt(tx *gorm.DB, owedBy, owedTo uint, amount decimal.Decimal, curr
 	}
 
 	return nil
+}
+
+func DebtsToSettle(tx *gorm.DB, owedBy uint, owedTo *uint) ([]dbmodels.DebtDBEntry, error) {
+	if owedTo != nil && owedBy == *owedTo {
+		return nil, fmt.Errorf("cannot settle debt to self")
+	}
+
+	query := tx.Model(&dbmodels.DebtDBEntry{}).Where(
+		"(user_low_id = ? AND net_amount > 0) OR (user_high_id = ? AND net_amount < 0)",
+		owedBy,
+		owedBy,
+	)
+
+	if owedTo != nil {
+		lowUserID, highUserID := canonicalPair(owedBy, *owedTo)
+		query = query.Where("user_low_id = ? AND user_high_id = ?", lowUserID, highUserID)
+	}
+
+	var debts []dbmodels.DebtDBEntry
+	if err := query.Find(&debts).Error; err != nil {
+		return nil, fmt.Errorf("query debts to settle: %w", err)
+	}
+
+	return debts, nil
+}
+
+func SettleDebts(tx *gorm.DB, owedBy uint, owedTo *uint) (int64, error) {
+	debts, err := DebtsToSettle(tx, owedBy, owedTo)
+	if err != nil {
+		return 0, err
+	}
+	if len(debts) == 0 {
+		return 0, nil
+	}
+
+	ids := make([]uint, 0, len(debts))
+	for _, debt := range debts {
+		ids = append(ids, debt.ID)
+	}
+
+	result := tx.Unscoped().Delete(&dbmodels.DebtDBEntry{}, ids)
+	if result.Error != nil {
+		return 0, fmt.Errorf("settle debts: %w", result.Error)
+	}
+
+	return result.RowsAffected, nil
 }

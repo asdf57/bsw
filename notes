@@ -15,3 +15,22 @@
 
 Nice to have:
 - Tagging systems -- transppration, food, housing, other
+
+
+
+
+
+
+
+/getusers
+
+- Payment modal enhancements
+    - Desctipyion., amount => user filled
+    - Rest dropdownds
+- /settle <a> <b>
+- Show hidden payments
+- payer name in command's param list rather than modal
+
+- Tagging feature =>
+
+- Analytics => amount spent per person

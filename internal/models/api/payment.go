@@ -7,14 +7,14 @@ import (
 )
 
 type Payment struct {
-	Amount           float64   `json:"amount"`
-	Payer            string    `json:"payer"`
-	Description      string    `json:"description"`
-	Date             time.Time `json:"date"`
-	FromExchangeRate string    `json:"fromExchangeRate"`
-	ToExchangeRate   string    `json:"toExchangeRate"`
-	Debtors          []string  `json:"debtors"`
-	DebtMode         string    `json:"debtMode"`
+	Amount      float64   `json:"amount"`
+	Payer       string    `json:"payer"`
+	Description string    `json:"description"`
+	Date        time.Time `json:"date"`
+	Currency    string    `json:"currency"`
+	Debtors     []string  `json:"debtors"`
+	Tags        []string  `json:"tags"`
+	DebtMode    string    `json:"debtMode"`
 }
 
 type PaymentResponse struct {
@@ -24,5 +24,6 @@ type PaymentResponse struct {
 	Date        time.Time       `json:"date"`
 	Payer       UserSummary     `json:"payer"`
 	Debtors     []UserSummary   `json:"debtors"`
-	Exchange    ExchangeSummary `json:"exchange"`
+	Currency    string          `json:"currency"`
+	Tags        []string        `json:"tags"`
 }

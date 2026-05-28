@@ -193,6 +193,15 @@
                     "debts"
                 ],
                 "summary": "Fetch all debts as From-To user debt pairs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "USD",
+                        "description": "Currency for generated debts",
+                        "name": "currency",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -200,6 +209,134 @@
                             "type": "array",
                             "items": {
                                 "$ref": "#/definitions/api.DebtResponse"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/debts/settle": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "debts"
+                ],
+                "summary": "Settle debts for a user",
+                "parameters": [
+                    {
+                        "description": "Settle debts payload",
+                        "name": "settle",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.SettleDebtsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.SettleDebtsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/debts/settlements": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "debts"
+                ],
+                "summary": "Fetch settlement history",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.SettlementResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/debts/settlements/{id}/reverse": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "debts"
+                ],
+                "summary": "Reverse a settlement by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Settlement ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.SettlementResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
                             }
                         }
                     },
@@ -233,6 +370,15 @@
                     "debts"
                 ],
                 "summary": "Fetch a map of users to their debts",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "USD",
+                        "description": "Currency for generated debts",
+                        "name": "currency",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -372,6 +518,101 @@
                 }
             }
         },
+        "/api/v1/payment/tag/{tag}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payment"
+                ],
+                "summary": "Get payments by tag",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Payment tag",
+                        "name": "tag",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.PaymentResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/payment/tags": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payment"
+                ],
+                "summary": "Get payments by tags",
+                "parameters": [
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Payment tags",
+                        "name": "tags",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "and",
+                            "or"
+                        ],
+                        "type": "string",
+                        "default": "and",
+                        "description": "Tag operation: and/or",
+                        "name": "op",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.PaymentResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/payment/{id}": {
             "get": {
                 "produces": [
@@ -395,6 +636,71 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.PaymentResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payment"
+                ],
+                "summary": "Update a payment by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Payment ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Payment payload",
+                        "name": "payment",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.Payment"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.PaymentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "404": {
@@ -446,6 +752,139 @@
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/stats/user": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "stats"
+                ],
+                "summary": "Get user spending statistics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User name",
+                        "name": "user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "USD",
+                        "description": "Currency for generated stats",
+                        "name": "currency",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.UserStatsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tags": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tag"
+                ],
+                "summary": "Get all payment tags",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.TagResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tag"
+                ],
+                "summary": "Create a payment tag",
+                "parameters": [
+                    {
+                        "description": "Tag payload",
+                        "name": "tag",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.Tag"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.TagResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -645,31 +1084,14 @@
                 }
             }
         },
-        "api.ExchangeSummary": {
-            "type": "object",
-            "properties": {
-                "date": {
-                    "type": "string"
-                },
-                "fromCurrency": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "rate": {
-                    "type": "number"
-                },
-                "toCurrency": {
-                    "type": "string"
-                }
-            }
-        },
         "api.Payment": {
             "type": "object",
             "properties": {
                 "amount": {
                     "type": "number"
+                },
+                "currency": {
+                    "type": "string"
                 },
                 "date": {
                     "type": "string"
@@ -686,14 +1108,14 @@
                 "description": {
                     "type": "string"
                 },
-                "fromExchangeRate": {
-                    "type": "string"
-                },
                 "payer": {
                     "type": "string"
                 },
-                "toExchangeRate": {
-                    "type": "string"
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -702,6 +1124,9 @@
             "properties": {
                 "amount": {
                     "type": "number"
+                },
+                "currency": {
+                    "type": "string"
                 },
                 "date": {
                     "type": "string"
@@ -715,28 +1140,136 @@
                 "description": {
                     "type": "string"
                 },
-                "exchange": {
-                    "$ref": "#/definitions/api.ExchangeSummary"
-                },
                 "id": {
                     "type": "integer"
                 },
                 "payer": {
                     "$ref": "#/definitions/api.UserSummary"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.SettleDebtsRequest": {
+            "type": "object",
+            "required": [
+                "owedBy"
+            ],
+            "properties": {
+                "owedBy": {
+                    "type": "string"
+                },
+                "owedTo": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.SettleDebtsResponse": {
+            "type": "object",
+            "properties": {
+                "owedBy": {
+                    "type": "string"
+                },
+                "owedTo": {
+                    "type": "string"
+                },
+                "settledCount": {
+                    "type": "integer"
+                },
+                "settlements": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.SettlementResponse"
+                    }
+                }
+            }
+        },
+        "api.SettlementResponse": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "owedByUser": {
+                    "$ref": "#/definitions/api.UserSummary"
+                },
+                "owedToUser": {
+                    "$ref": "#/definitions/api.UserSummary"
+                },
+                "reversedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.Tag": {
+            "type": "object",
+            "properties": {
+                "tag": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.TagResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "tag": {
+                    "type": "string"
                 }
             }
         },
         "api.User": {
             "type": "object",
             "properties": {
+                "discordHandle": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
+                }
+            }
+        },
+        "api.UserStatsResponse": {
+            "type": "object",
+            "properties": {
+                "currency": {
+                    "type": "string"
+                },
+                "paymentsIncluded": {
+                    "type": "integer"
+                },
+                "spentOut": {
+                    "type": "number"
+                },
+                "totalSpent": {
+                    "type": "number"
+                },
+                "user": {
+                    "$ref": "#/definitions/api.UserSummary"
                 }
             }
         },
         "api.UserSummary": {
             "type": "object",
             "properties": {
+                "discordHandle": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },

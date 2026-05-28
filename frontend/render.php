@@ -1174,8 +1174,8 @@ function h(string $v): string
             PayerName: payer?.name ?? payment?.PayerName ?? "",
             Payer: payer,
             Owers: debtors,
-            FromExchangeRate: exchange?.fromCurrency ?? payment?.FromExchangeRate ?? "",
-            ToExchangeRate: exchange?.toCurrency ?? payment?.ToExchangeRate ?? "",
+            FromExchangeRate: payment?.currency ?? payment?.Currency ?? exchange?.fromCurrency ?? payment?.FromExchangeRate ?? "",
+            ToExchangeRate: payment?.currency ?? payment?.Currency ?? exchange?.toCurrency ?? payment?.ToExchangeRate ?? "",
             ExchangeRate: exchange?.rate ?? payment?.ExchangeRate ?? null,
           };
         },
@@ -1418,8 +1418,7 @@ function h(string $v): string
                 debtors: owers,
                 payer: this.newPayment.payer,
                 description: this.newPayment.description,
-                fromExchangeRate: this.newPayment.fromExchangeRate,
-                toExchangeRate: this.newPayment.toExchangeRate,
+                currency: this.newPayment.fromExchangeRate,
               }),
             });
             this.newPayment = { amount: "", payer: "", description: "", fromExchangeRate: "USD", toExchangeRate: "USD", owers: [] };

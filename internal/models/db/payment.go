@@ -14,9 +14,9 @@ type PaymentDBEntry struct {
 	Date        time.Time
 	PayerID     uint
 	Payer       UserDBEntry
-	ExchangeID  uint
-	Exchange    ExchangeDBEntry
+	Currency    string
 	Debtors     []UserDBEntry `gorm:"many2many:debtors;constraint:OnDelete:CASCADE;"`
+	Tags        []TagDBEntry  `gorm:"many2many:payment_tags;constraint:OnDelete:CASCADE;"`
 }
 
 func (PaymentDBEntry) TableName() string { return "payments" }

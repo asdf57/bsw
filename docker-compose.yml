@@ -56,7 +56,7 @@ services:
       dockerfile: Dockerfile.bot
     container_name: "bot"
     environment:
-      DISCORD_BOT_TOKEN: ""
+      DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN:-}"
       API_URL: "http://app:8080"
     depends_on:
       - app

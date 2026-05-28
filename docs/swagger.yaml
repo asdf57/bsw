@@ -23,23 +23,12 @@ definitions:
       toCurrency:
         type: string
     type: object
-  api.ExchangeSummary:
-    properties:
-      date:
-        type: string
-      fromCurrency:
-        type: string
-      id:
-        type: integer
-      rate:
-        type: number
-      toCurrency:
-        type: string
-    type: object
   api.Payment:
     properties:
       amount:
         type: number
+      currency:
+        type: string
       date:
         type: string
       debtMode:
@@ -50,17 +39,19 @@ definitions:
         type: array
       description:
         type: string
-      fromExchangeRate:
-        type: string
       payer:
         type: string
-      toExchangeRate:
-        type: string
+      tags:
+        items:
+          type: string
+        type: array
     type: object
   api.PaymentResponse:
     properties:
       amount:
         type: number
+      currency:
+        type: string
       date:
         type: string
       debtors:
@@ -69,20 +60,90 @@ definitions:
         type: array
       description:
         type: string
-      exchange:
-        $ref: '#/definitions/api.ExchangeSummary'
       id:
         type: integer
       payer:
         $ref: '#/definitions/api.UserSummary'
+      tags:
+        items:
+          type: string
+        type: array
+    type: object
+  api.SettleDebtsRequest:
+    properties:
+      owedBy:
+        type: string
+      owedTo:
+        type: string
+    required:
+    - owedBy
+    type: object
+  api.SettleDebtsResponse:
+    properties:
+      owedBy:
+        type: string
+      owedTo:
+        type: string
+      settledCount:
+        type: integer
+      settlements:
+        items:
+          $ref: '#/definitions/api.SettlementResponse'
+        type: array
+    type: object
+  api.SettlementResponse:
+    properties:
+      amount:
+        type: number
+      currency:
+        type: string
+      date:
+        type: string
+      id:
+        type: integer
+      owedByUser:
+        $ref: '#/definitions/api.UserSummary'
+      owedToUser:
+        $ref: '#/definitions/api.UserSummary'
+      reversedAt:
+        type: string
+    type: object
+  api.Tag:
+    properties:
+      tag:
+        type: string
+    type: object
+  api.TagResponse:
+    properties:
+      id:
+        type: integer
+      tag:
+        type: string
     type: object
   api.User:
     properties:
+      discordHandle:
+        type: string
       name:
         type: string
     type: object
+  api.UserStatsResponse:
+    properties:
+      currency:
+        type: string
+      paymentsIncluded:
+        type: integer
+      spentOut:
+        type: number
+      totalSpent:
+        type: number
+      user:
+        $ref: '#/definitions/api.UserSummary'
+    type: object
   api.UserSummary:
     properties:
+      discordHandle:
+        type: string
       id:
         type: integer
       name:
@@ -213,6 +274,12 @@ paths:
       - admin
   /api/v1/debts:
     get:
+      parameters:
+      - default: USD
+        description: Currency for generated debts
+        in: query
+        name: currency
+        type: string
       produces:
       - application/json
       responses:
@@ -237,8 +304,97 @@ paths:
       summary: Fetch all debts as From-To user debt pairs
       tags:
       - debts
+  /api/v1/debts/settle:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Settle debts payload
+        in: body
+        name: settle
+        required: true
+        schema:
+          $ref: '#/definitions/api.SettleDebtsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SettleDebtsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Settle debts for a user
+      tags:
+      - debts
+  /api/v1/debts/settlements:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.SettlementResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Fetch settlement history
+      tags:
+      - debts
+  /api/v1/debts/settlements/{id}/reverse:
+    post:
+      parameters:
+      - description: Settlement ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SettlementResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Reverse a settlement by ID
+      tags:
+      - debts
   /api/v1/debts/users:
     get:
+      parameters:
+      - default: USD
+        description: Currency for generated debts
+        in: query
+        name: currency
+        type: string
       produces:
       - application/json
       responses:
@@ -374,6 +530,49 @@ paths:
       summary: Get a payment by ID
       tags:
       - payment
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Payment ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Payment payload
+        in: body
+        name: payment
+        required: true
+        schema:
+          $ref: '#/definitions/api.Payment'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.PaymentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update a payment by ID
+      tags:
+      - payment
   /api/v1/payment/all:
     get:
       produces:
@@ -394,6 +593,156 @@ paths:
       summary: Get all payments
       tags:
       - payment
+  /api/v1/payment/tag/{tag}:
+    get:
+      parameters:
+      - description: Payment tag
+        in: path
+        name: tag
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.PaymentResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get payments by tag
+      tags:
+      - payment
+  /api/v1/payment/tags:
+    get:
+      parameters:
+      - collectionFormat: multi
+        description: Payment tags
+        in: query
+        items:
+          type: string
+        name: tags
+        required: true
+        type: array
+      - default: and
+        description: 'Tag operation: and/or'
+        enum:
+        - and
+        - or
+        in: query
+        name: op
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.PaymentResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get payments by tags
+      tags:
+      - payment
+  /api/v1/stats/user:
+    get:
+      parameters:
+      - description: User name
+        in: query
+        name: user
+        required: true
+        type: string
+      - default: USD
+        description: Currency for generated stats
+        in: query
+        name: currency
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.UserStatsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get user spending statistics
+      tags:
+      - stats
+  /api/v1/tags:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.TagResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get all payment tags
+      tags:
+      - tag
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Tag payload
+        in: body
+        name: tag
+        required: true
+        schema:
+          $ref: '#/definitions/api.Tag'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.TagResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create a payment tag
+      tags:
+      - tag
   /api/v1/user:
     get:
       produces:

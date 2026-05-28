@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	apimodels "github.com/asdf57/bsw/internal/models/api"
 	dbmodels "github.com/asdf57/bsw/internal/models/db"
@@ -31,7 +32,14 @@ func (h *Handlers) CreateUser(c *gin.Context) {
 		return
 	}
 
-	record := dbmodels.UserDBEntry{Name: user.Name}
+	record := dbmodels.UserDBEntry{
+		Name:          strings.TrimSpace(user.Name),
+		DiscordHandle: strings.TrimSpace(user.DiscordHandle),
+	}
+	if record.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+		return
+	}
 	if err := h.Db.DB.Create(&record).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to create user in the DB: %s", err.Error())})
 		return
