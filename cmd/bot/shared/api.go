@@ -433,6 +433,57 @@ func CreateUser(username string, discordHandle string) error {
 	return nil
 }
 
+func ExportCheckpoint() ([]byte, error) {
+	apiURL, err := apiURL()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.Get(apiURL + "/api/v1/admin/export")
+	if err != nil {
+		return nil, fmt.Errorf("error making http get: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading export response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d %s: %s", resp.StatusCode, resp.Status, string(body))
+	}
+
+	return body, nil
+}
+
+func ImportCheckpoint(data []byte) (*apimodels.CheckpointImportResponse, error) {
+	apiURL, err := apiURL()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.Post(apiURL+"/api/v1/admin/import", "application/json", bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to import checkpoint: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading import response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d %s: %s", resp.StatusCode, resp.Status, string(respBody))
+	}
+
+	var importResp apimodels.CheckpointImportResponse
+	if err := json.Unmarshal(respBody, &importResp); err != nil {
+		return nil, fmt.Errorf("error decoding import response: %w", err)
+	}
+
+	return &importResp, nil
+}
+
 func NormalizePaymentCurrency(currency string) string {
 	cleaned := strings.ToUpper(strings.TrimSpace(currency))
 	if cleaned == "" {

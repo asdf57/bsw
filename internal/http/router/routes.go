@@ -43,6 +43,8 @@ func RegisterV1(r *gin.Engine, h *handlers.Handlers) *gin.RouterGroup {
 	admin := v1.Group("/admin")
 	admin.POST("/backup", h.BackupDB)
 	admin.GET("/backup/:filename", h.GetBackup)
+	admin.GET("/export", h.ExportCheckpoint)
+	admin.POST("/import", h.ImportCheckpoint)
 	admin.GET("/exchange-rate", h.GetExchangeRate)
 	admin.GET("/exchange-rates", h.GetExchangeRatesFromDB)
 

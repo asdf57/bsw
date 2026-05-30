@@ -1,4 +1,123 @@
 definitions:
+  api.Checkpoint:
+    properties:
+      debts:
+        items:
+          $ref: '#/definitions/api.CheckpointDebt'
+        type: array
+      exchangeRates:
+        items:
+          $ref: '#/definitions/api.Exchange'
+        type: array
+      exportedAt:
+        type: string
+      payments:
+        items:
+          $ref: '#/definitions/api.CheckpointPayment'
+        type: array
+      settlements:
+        items:
+          $ref: '#/definitions/api.CheckpointSettlement'
+        type: array
+      tags:
+        items:
+          $ref: '#/definitions/api.CheckpointTag'
+        type: array
+      users:
+        items:
+          $ref: '#/definitions/api.CheckpointUser'
+        type: array
+      version:
+        type: integer
+    type: object
+  api.CheckpointDebt:
+    properties:
+      amount:
+        type: number
+      createdAt:
+        type: string
+      currency:
+        type: string
+      id:
+        type: integer
+      owedBy:
+        type: string
+      owedTo:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  api.CheckpointImportResponse:
+    properties:
+      debts:
+        type: integer
+      exchangeRates:
+        type: integer
+      payments:
+        type: integer
+      settlements:
+        type: integer
+      tags:
+        type: integer
+      users:
+        type: integer
+    type: object
+  api.CheckpointPayment:
+    properties:
+      amount:
+        type: number
+      currency:
+        type: string
+      date:
+        type: string
+      debtors:
+        items:
+          type: string
+        type: array
+      description:
+        type: string
+      id:
+        type: integer
+      payer:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+    type: object
+  api.CheckpointSettlement:
+    properties:
+      amount:
+        type: number
+      currency:
+        type: string
+      date:
+        type: string
+      id:
+        type: integer
+      owedBy:
+        type: string
+      owedTo:
+        type: string
+      reversedAt:
+        type: string
+    type: object
+  api.CheckpointTag:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  api.CheckpointUser:
+    properties:
+      discordHandle:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
   api.DebtResponse:
     properties:
       amount:
@@ -270,6 +389,57 @@ paths:
               type: string
             type: object
       summary: Get all exchange rates stored in the DB
+      tags:
+      - admin
+  /api/v1/admin/export:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Checkpoint'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Export a portable system checkpoint
+      tags:
+      - admin
+  /api/v1/admin/import:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Checkpoint payload
+        in: body
+        name: checkpoint
+        required: true
+        schema:
+          $ref: '#/definitions/api.Checkpoint'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CheckpointImportResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Import a portable system checkpoint and replace current app state
       tags:
       - admin
   /api/v1/debts:

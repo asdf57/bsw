@@ -6,6 +6,7 @@ import (
 
 	"github.com/asdf57/bsw/cmd/bot/features/debt"
 	"github.com/asdf57/bsw/cmd/bot/features/payment"
+	"github.com/asdf57/bsw/cmd/bot/features/system"
 	"github.com/asdf57/bsw/cmd/bot/features/tag"
 	"github.com/asdf57/bsw/cmd/bot/features/user"
 	"github.com/bwmarrin/discordgo"
@@ -59,6 +60,14 @@ func OnInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		case "reversesettlement":
 			if err := debt.HandleReverseSettlement(s, i); err != nil {
 				log.Printf("reversesettlement failed: %v", err)
+			}
+		case "exportdata":
+			if err := system.HandleExportData(s, i); err != nil {
+				log.Printf("exportdata failed: %v", err)
+			}
+		case "importdata":
+			if err := system.HandleImportData(s, i); err != nil {
+				log.Printf("importdata failed: %v", err)
 			}
 		}
 	case discordgo.InteractionMessageComponent:

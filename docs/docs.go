@@ -195,6 +195,85 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/admin/export": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Export a portable system checkpoint",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Checkpoint"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/import": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Import a portable system checkpoint and replace current app state",
+                "parameters": [
+                    {
+                        "description": "Checkpoint payload",
+                        "name": "checkpoint",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.Checkpoint"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CheckpointImportResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/debts": {
             "get": {
                 "produces": [
@@ -1058,6 +1137,188 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "api.Checkpoint": {
+            "type": "object",
+            "properties": {
+                "debts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.CheckpointDebt"
+                    }
+                },
+                "exchangeRates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.Exchange"
+                    }
+                },
+                "exportedAt": {
+                    "type": "string"
+                },
+                "payments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.CheckpointPayment"
+                    }
+                },
+                "settlements": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.CheckpointSettlement"
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.CheckpointTag"
+                    }
+                },
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.CheckpointUser"
+                    }
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.CheckpointDebt": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "owedBy": {
+                    "type": "string"
+                },
+                "owedTo": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.CheckpointImportResponse": {
+            "type": "object",
+            "properties": {
+                "debts": {
+                    "type": "integer"
+                },
+                "exchangeRates": {
+                    "type": "integer"
+                },
+                "payments": {
+                    "type": "integer"
+                },
+                "settlements": {
+                    "type": "integer"
+                },
+                "tags": {
+                    "type": "integer"
+                },
+                "users": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.CheckpointPayment": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "debtors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "payer": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.CheckpointSettlement": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "owedBy": {
+                    "type": "string"
+                },
+                "owedTo": {
+                    "type": "string"
+                },
+                "reversedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.CheckpointTag": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.CheckpointUser": {
+            "type": "object",
+            "properties": {
+                "discordHandle": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "api.DebtResponse": {
             "type": "object",
             "properties": {

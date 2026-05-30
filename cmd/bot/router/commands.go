@@ -23,6 +23,10 @@ func RegisterCommands(s *discordgo.Session) error {
 		{Name: "reversesettlement", Description: "Reverse a settlement", Options: []*discordgo.ApplicationCommandOption{
 			{Type: discordgo.ApplicationCommandOptionInteger, Name: "id", Description: "Settlement ID", Required: true},
 		}},
+		{Name: "exportdata", Description: "Export a system checkpoint JSON file"},
+		{Name: "importdata", Description: "Import a system checkpoint JSON file", Options: []*discordgo.ApplicationCommandOption{
+			{Type: discordgo.ApplicationCommandOptionAttachment, Name: "file", Description: "Checkpoint JSON file", Required: true},
+		}},
 	}
 	for _, cmd := range commands {
 		if _, err := s.ApplicationCommandCreate(s.State.User.ID, "", cmd); err != nil {
