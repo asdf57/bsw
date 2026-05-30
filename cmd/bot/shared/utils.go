@@ -5,22 +5,55 @@ import (
 	"strings"
 
 	apimodels "github.com/asdf57/bsw/internal/models/api"
-	currencylib "golang.org/x/text/currency"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
+	"github.com/shopspring/decimal"
 )
 
 func FormatAmount(payment apimodels.Payment) string {
-	currencyCode := strings.ToUpper(strings.TrimSpace(payment.Currency))
+	return FormatDecimalAmount(decimal.NewFromFloat(payment.Amount), payment.Currency)
+}
+
+func FormatDecimalAmount(amount decimal.Decimal, currency string) string {
+	currencyCode := strings.ToUpper(strings.TrimSpace(currency))
 	if currencyCode == "" {
-		return fmt.Sprintf("%.2f", payment.Amount)
+		return amount.StringFixed(2)
 	}
 
-	unit, err := currencylib.ParseISO(currencyCode)
-	if err != nil {
-		return fmt.Sprintf("%.2f %s", payment.Amount, currencyCode)
+	symbol, ok := currencySymbols[currencyCode]
+	if !ok {
+		return fmt.Sprintf("%s %s", amount.StringFixed(2), currencyCode)
 	}
 
-	p := message.NewPrinter(language.AmericanEnglish)
-	return p.Sprintf("%v", currencylib.Symbol(unit.Amount(payment.Amount)))
+	return symbol + formatDecimalWithCommas(amount, 2)
+}
+
+var currencySymbols = map[string]string{
+	"AUD": "A$",
+	"CAD": "C$",
+	"CHF": "CHF ",
+	"CNY": "¥",
+	"EUR": "€",
+	"GBP": "£",
+	"JPY": "¥",
+	"KRW": "₩",
+	"USD": "$",
+}
+
+func formatDecimalWithCommas(amount decimal.Decimal, places int32) string {
+	value := amount.StringFixed(places)
+	sign := ""
+	if strings.HasPrefix(value, "-") {
+		sign = "-"
+		value = strings.TrimPrefix(value, "-")
+	}
+
+	parts := strings.SplitN(value, ".", 2)
+	whole := parts[0]
+	for i := len(whole) - 3; i > 0; i -= 3 {
+		whole = whole[:i] + "," + whole[i:]
+	}
+
+	if len(parts) == 1 {
+		return sign + whole
+	}
+	return sign + whole + "." + parts[1]
 }

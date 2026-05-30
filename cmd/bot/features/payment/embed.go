@@ -78,16 +78,7 @@ func formatTags(tags []string) string {
 }
 
 func formatResponseAmount(payment apimodels.PaymentResponse) string {
-	// fromCurrency := strings.ToUpper(strings.TrimSpace(payment.Exchange.FromCurrency))
-	// toCurrency := strings.ToUpper(strings.TrimSpace(payment.Exchange.ToCurrency))
-	amount := payment.Amount.StringFixed(2)
-	// if toCurrency == "" && fromCurrency == "" {
-	// 	return amount
-	// }
-	// if toCurrency == "" || toCurrency == fromCurrency {
-	// 	return fmt.Sprintf("%s %s", amount, fromCurrency)
-	// }
-	return fmt.Sprintf("%s", amount)
+	return shared.FormatDecimalAmount(payment.Amount, payment.Currency)
 }
 
 func formatResponseDebtors(debtors []apimodels.UserSummary) string {
