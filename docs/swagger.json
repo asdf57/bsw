@@ -539,10 +539,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/api.PaymentCreateResponse"
                         }
                     },
                     "400": {
@@ -1380,6 +1377,17 @@
                 }
             }
         },
+        "api.PaymentCreateResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "info": {
+                    "type": "string"
+                }
+            }
+        },
         "api.PaymentResponse": {
             "type": "object",
             "properties": {
@@ -1421,6 +1429,9 @@
                 "owedBy"
             ],
             "properties": {
+                "amount": {
+                    "type": "number"
+                },
                 "owedBy": {
                     "type": "string"
                 },

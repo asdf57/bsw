@@ -550,10 +550,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/api.PaymentCreateResponse"
                         }
                     },
                     "400": {
@@ -1391,6 +1388,17 @@ const docTemplate = `{
                 }
             }
         },
+        "api.PaymentCreateResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "info": {
+                    "type": "string"
+                }
+            }
+        },
         "api.PaymentResponse": {
             "type": "object",
             "properties": {
@@ -1432,6 +1440,9 @@ const docTemplate = `{
                 "owedBy"
             ],
             "properties": {
+                "amount": {
+                    "type": "number"
+                },
                 "owedBy": {
                     "type": "string"
                 },
