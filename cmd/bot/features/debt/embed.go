@@ -25,7 +25,8 @@ func CreateSettleUpEmbed(owedBy string, owedTo string, settledCount int64, settl
 	if len(settlements) > 0 {
 		lines := make([]string, 0, len(settlements))
 		for _, settlement := range settlements {
-			lines = append(lines, fmt.Sprintf("%s -> %s: %s",
+			lines = append(lines, fmt.Sprintf("#%d • %s -> %s: %s",
+				settlement.ID,
 				settlement.OwedByUser.Name,
 				settlement.OwedToUser.Name,
 				shared.FormatAmount(apimodels.Payment{Amount: settlement.Amount.InexactFloat64(), Currency: settlement.Currency}),
@@ -137,7 +138,8 @@ func ListSettlementsMessage(settlements []apimodels.SettlementResponse) string {
 		if settlement.ReversedAt != nil {
 			status = " (reversed)"
 		}
-		lines = append(lines, fmt.Sprintf("• **%s -> %s:** `%s` on `%s`",
+		lines = append(lines, fmt.Sprintf("• `#%d` **%s -> %s:** `%s` on `%s`",
+			settlement.ID,
 			settlement.OwedByUser.Name,
 			settlement.OwedToUser.Name,
 			shared.FormatAmount(apimodels.Payment{Amount: settlement.Amount.InexactFloat64(), Currency: settlement.Currency}),

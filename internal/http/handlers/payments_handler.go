@@ -133,7 +133,7 @@ func (h *Handlers) GetAllPayments(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param payment body api.Payment true "Payment payload"
-// @Success 200 {object} map[string]string
+// @Success 200 {object} api.PaymentCreateResponse
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/payment [post]
@@ -208,7 +208,7 @@ func (h *Handlers) PostPayment(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"info": fmt.Sprintf("payment created with id %d", paymentId)})
+	c.JSON(http.StatusOK, apimodels.PaymentCreateResponse{ID: paymentId, Info: fmt.Sprintf("payment created with id %d", paymentId)})
 }
 
 // PutPayment godoc

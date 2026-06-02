@@ -149,3 +149,21 @@ func SettleDebts(tx *gorm.DB, owedBy uint, owedTo *uint) (int64, error) {
 
 	return result.RowsAffected, nil
 }
+
+func SettleDebtAmount(tx *gorm.DB, debt dbmodels.DebtDBEntry, amount decimal.Decimal) error {
+	if amount.LessThanOrEqual(decimal.Zero) {
+		return fmt.Errorf("settlement amount must be greater than zero")
+	}
+	total := debt.NetAmount.Abs()
+	if amount.GreaterThan(total) {
+		return fmt.Errorf("settlement amount cannot exceed %s", total.StringFixed(2))
+	}
+
+	owedBy := GetOwedByUser(debt)
+	owedTo := GetOwedToUser(debt)
+	if amount.Equal(total) {
+		return tx.Unscoped().Delete(&debt).Error
+	}
+
+	return ApplyNetDebt(tx, owedTo, owedBy, amount, debt.Currency)
+}

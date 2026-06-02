@@ -21,16 +21,14 @@ func currencyOptions(selected string) []discordgo.SelectMenuOption {
 	for _, currency := range currencies {
 		options = append(options, discordgo.SelectMenuOption{Label: currency, Value: currency, Default: currency == selected})
 	}
-	if selected == "" {
-		options[0].Default = true
-	}
 	return options
 }
 
-func OpenAddPaymentModal(s *discordgo.Session, i *discordgo.InteractionCreate, payer string) error {
+func OpenAddPaymentModal(s *discordgo.Session, i *discordgo.InteractionCreate, payer string, selectedCurrency string) error {
 	required := true
 	minValues := 1
 	optional := false
+	selectedCurrency = shared.NormalizePaymentCurrency(selectedCurrency)
 
 	users, err := shared.GetUsers()
 	if err != nil {
@@ -47,11 +45,12 @@ func OpenAddPaymentModal(s *discordgo.Session, i *discordgo.InteractionCreate, p
 	return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseModal,
 		Data: &discordgo.InteractionResponseData{
-			CustomID: ModalCustomID(payer),
+			CustomID: ModalCustomID(payer, selectedCurrency),
 			Title:    "Add Payment",
 			Components: []discordgo.MessageComponent{
 				discordgo.Label{Label: "Amount", Component: discordgo.TextInput{CustomID: "amount", Style: discordgo.TextInputShort, Placeholder: "10.00", Required: &required}},
 				discordgo.Label{Label: "Description", Component: discordgo.TextInput{CustomID: "description", Style: discordgo.TextInputShort, Placeholder: "Dinner", Required: &required}},
+				discordgo.Label{Label: "Payment Date", Description: "UTC. Use YYYY-MM-DD, YYYY-MM-DD HH:MM, or RFC3339.", Component: discordgo.TextInput{CustomID: "date", Style: discordgo.TextInputShort, Value: paymentDateInputValue(time.Now().UTC()), Required: &required}},
 				discordgo.Label{Label: "Tags", Description: "Select one or more. Leave empty for general.", Component: func() discordgo.SelectMenu {
 					menu := discordgo.SelectMenu{MenuType: discordgo.StringSelectMenu, CustomID: "tags", Placeholder: "Select tags", Required: &optional, Options: tagOpts}
 					if len(tagOpts) > 0 {
@@ -62,7 +61,6 @@ func OpenAddPaymentModal(s *discordgo.Session, i *discordgo.InteractionCreate, p
 					}
 					return menu
 				}()},
-				discordgo.Label{Label: "Currency", Description: "Choose the payment currency.", Component: discordgo.SelectMenu{MenuType: discordgo.StringSelectMenu, CustomID: "currency", Placeholder: "Select a currency", MaxValues: 1, Required: &required, Options: currencyOptions("USD")}},
 				discordgo.Label{Label: "Debtors", Component: func() discordgo.SelectMenu {
 					menu := discordgo.SelectMenu{MenuType: discordgo.StringSelectMenu, CustomID: "debtors", Placeholder: "Select debtors", Required: &optional, Options: debtorOptions}
 					if len(debtorOptions) > 0 {
@@ -79,26 +77,65 @@ func OpenAddPaymentModal(s *discordgo.Session, i *discordgo.InteractionCreate, p
 	})
 }
 
-func OpenPaymentPayerPicker(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+func OpenPaymentCurrencyPicker(s *discordgo.Session, i *discordgo.InteractionCreate) error {
 	required := true
-	users, err := shared.GetUsers()
-	if err != nil {
-		return fmt.Errorf("failed to fetch users: %w", err)
-	}
-	userOpts := userOptions(users, "")
-	if len(userOpts) == 0 {
-		return shared.RespondWithMessage(s, i, "No users available. Add users first with `/adduser`.")
-	}
 
 	return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: "Select a payer to continue.",
+			Content: "Select a currency to continue.",
+			Flags:   discordgo.MessageFlagsEphemeral,
 			Components: []discordgo.MessageComponent{
-				discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.SelectMenu{MenuType: discordgo.StringSelectMenu, CustomID: PayerSelectID, Placeholder: "Select payer", MaxValues: 1, Required: &required, Options: userOpts}}},
+				discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.SelectMenu{MenuType: discordgo.StringSelectMenu, CustomID: CurrencySelectID, Placeholder: "Select currency", MaxValues: 1, Required: &required, Options: currencyOptions("")}}},
 			},
 		},
 	})
+}
+
+func paymentDateInputValue(t time.Time) string {
+	return t.UTC().Format("2006-01-02 15:04")
+}
+
+func OpenPaymentPayerPicker(s *discordgo.Session, i *discordgo.InteractionCreate, currency string) error {
+	data, err := paymentPayerPickerData(currency)
+	if err != nil {
+		return err
+	}
+	return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: data,
+	})
+}
+
+func UpdatePaymentPayerPicker(s *discordgo.Session, i *discordgo.InteractionCreate, currency string) error {
+	data, err := paymentPayerPickerData(currency)
+	if err != nil {
+		return err
+	}
+	return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseUpdateMessage,
+		Data: data,
+	})
+}
+
+func paymentPayerPickerData(currency string) (*discordgo.InteractionResponseData, error) {
+	required := true
+	users, err := shared.GetUsers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch users: %w", err)
+	}
+	userOpts := userOptions(users, "")
+	if len(userOpts) == 0 {
+		return nil, fmt.Errorf("no users available; add users first with /adduser")
+	}
+
+	return &discordgo.InteractionResponseData{
+		Content: fmt.Sprintf("Select a payer to continue. Currency: `%s`.", shared.NormalizePaymentCurrency(currency)),
+		Flags:   discordgo.MessageFlagsEphemeral,
+		Components: []discordgo.MessageComponent{
+			discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.SelectMenu{MenuType: discordgo.StringSelectMenu, CustomID: PayerSelectCustomID(shared.NormalizePaymentCurrency(currency)), Placeholder: "Select payer", MaxValues: 1, Required: &required, Options: userOpts}}},
+		},
+	}, nil
 }
 
 func OpenEditPaymentModal(s *discordgo.Session, i *discordgo.InteractionCreate, paymentID uint) error {

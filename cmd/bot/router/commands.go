@@ -17,9 +17,10 @@ func RegisterCommands(s *discordgo.Session) error {
 			{Type: discordgo.ApplicationCommandOptionInteger, Name: "id", Description: "Payment ID", Required: true},
 		}},
 		{Name: "adduser", Description: "Create a user"},
-		{Name: "settle", Description: "Settle up"},
+		{Name: "settleall", Description: "Settle all debts for a user"},
+		{Name: "settlecustom", Description: "Settle a custom amount between two users"},
 		{Name: "stats", Description: "Show user spending stats"},
-		{Name: "settlements", Description: "Show settlement history"},
+		{Name: "getsettlements", Description: "Show settlement history"},
 		{Name: "reversesettlement", Description: "Reverse a settlement", Options: []*discordgo.ApplicationCommandOption{
 			{Type: discordgo.ApplicationCommandOptionInteger, Name: "id", Description: "Settlement ID", Required: true},
 		}},

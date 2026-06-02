@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	CurrencySelectID      = "payment_select_currency"
 	PayerSelectID         = "payment_select_payer"
 	PaymentRangeSelectID  = "payment_select_range"
 	PaymentTagsSelectID   = "payment_select_tags"
@@ -21,30 +22,66 @@ const (
 	PaymentRangeCustom    = "custom"
 	PaymentTagOpAnd       = "and"
 	PaymentTagOpOr        = "or"
-	AddModalPrefix        = "addpayment_modal:payer="
+	AddModalPrefix        = "addpayment_modal:"
 	EditModalPrefix       = "editpayment_modal:id="
 	PaymentRangeModalID   = "getpayments_range_modal"
 	CustomRangeInputID    = "payment_range_since"
 )
 
-func ModalCustomID(payer string) string {
-	return AddModalPrefix + url.QueryEscape(strings.TrimSpace(payer))
+func PayerSelectCustomID(currency string) string {
+	return PayerSelectID + ":currency=" + url.QueryEscape(strings.TrimSpace(currency))
 }
 
-func PayerFromModalCustomID(customID string) (string, bool) {
-	if !strings.HasPrefix(customID, AddModalPrefix) {
+func CurrencyFromPayerSelectCustomID(customID string) (string, bool) {
+	if customID == PayerSelectID {
+		return "USD", true
+	}
+	prefix := PayerSelectID + ":currency="
+	if !strings.HasPrefix(customID, prefix) {
 		return "", false
 	}
-	raw := strings.TrimPrefix(customID, AddModalPrefix)
-	payer, err := url.QueryUnescape(raw)
+	raw := strings.TrimPrefix(customID, prefix)
+	currency, err := url.QueryUnescape(raw)
 	if err != nil {
 		return "", false
 	}
-	payer = strings.TrimSpace(payer)
-	if payer == "" {
-		return "", false
+	currency = strings.ToUpper(strings.TrimSpace(currency))
+	if currency == "" {
+		currency = "USD"
 	}
-	return payer, true
+	return currency, true
+}
+
+func ModalCustomID(payer string, currency string) string {
+	values := url.Values{}
+	values.Set("payer", strings.TrimSpace(payer))
+	values.Set("currency", strings.ToUpper(strings.TrimSpace(currency)))
+	return AddModalPrefix + values.Encode()
+}
+
+func PayerFromModalCustomID(customID string) (string, bool) {
+	payer, _, ok := PaymentContextFromModalCustomID(customID)
+	return payer, ok
+}
+
+func PaymentContextFromModalCustomID(customID string) (string, string, bool) {
+	if !strings.HasPrefix(customID, AddModalPrefix) {
+		return "", "", false
+	}
+	raw := strings.TrimPrefix(customID, AddModalPrefix)
+	values, err := url.ParseQuery(raw)
+	if err != nil {
+		return "", "", false
+	}
+	payer := strings.TrimSpace(values.Get("payer"))
+	if payer == "" {
+		return "", "", false
+	}
+	currency := strings.ToUpper(strings.TrimSpace(values.Get("currency")))
+	if currency == "" {
+		currency = "USD"
+	}
+	return payer, currency, true
 }
 
 func EditModalCustomID(paymentID uint) string {

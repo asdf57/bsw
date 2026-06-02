@@ -18,7 +18,7 @@ func DeleteEmbed(paymentID uint, err error) *discordgo.MessageEmbed {
 	return &discordgo.MessageEmbed{Title: "Payment Deleted", Description: "The payment was deleted successfully.", Color: 0x2ECC71, Fields: []*discordgo.MessageEmbedField{{Name: "Id", Value: "`" + strconv.FormatUint(uint64(paymentID), 10) + "`", Inline: true}}, Timestamp: time.Now().Format(time.RFC3339)}
 }
 
-func CreatedEmbed(payment apimodels.Payment, err error) *discordgo.MessageEmbed {
+func CreatedEmbed(payment apimodels.Payment, paymentID uint, err error) *discordgo.MessageEmbed {
 	if err != nil {
 		return &discordgo.MessageEmbed{Title: "Payment Creation Failed", Description: fmt.Sprintf("An error occurred while recording the payment:\n%s", err.Error()), Color: 0xE74C3C, Timestamp: time.Now().Format(time.RFC3339)}
 	}
@@ -26,7 +26,7 @@ func CreatedEmbed(payment apimodels.Payment, err error) *discordgo.MessageEmbed 
 	if description == "" {
 		description = "_none_"
 	}
-	return &discordgo.MessageEmbed{Title: "Payment Created", Description: "The payment was recorded successfully.", Color: 0x2ECC71, Fields: []*discordgo.MessageEmbedField{{Name: "Amount", Value: "`" + shared.FormatAmount(payment) + "`", Inline: true}, {Name: "Payer", Value: payment.Payer, Inline: true}, {Name: "Debtors", Value: formatDebtors(payment.Debtors), Inline: false}, {Name: "Tags", Value: formatTags(payment.Tags), Inline: false}, {Name: "Description", Value: description, Inline: false}}, Timestamp: time.Now().Format(time.RFC3339)}
+	return &discordgo.MessageEmbed{Title: "Payment Created", Description: "The payment was recorded successfully.", Color: 0x2ECC71, Fields: []*discordgo.MessageEmbedField{{Name: "ID", Value: "`" + strconv.FormatUint(uint64(paymentID), 10) + "`", Inline: true}, {Name: "Amount", Value: "`" + shared.FormatAmount(payment) + "`", Inline: true}, {Name: "Date", Value: payment.Date.UTC().Format("2006-01-02 15:04 UTC"), Inline: true}, {Name: "Payer", Value: payment.Payer, Inline: true}, {Name: "Debtors", Value: formatDebtors(payment.Debtors), Inline: false}, {Name: "Tags", Value: formatTags(payment.Tags), Inline: false}, {Name: "Description", Value: description, Inline: false}}, Timestamp: time.Now().Format(time.RFC3339)}
 }
 
 func CreatedPaymentEmbed(payment apimodels.Payment, err error) *discordgo.MessageEmbed {

@@ -17,6 +17,11 @@ type Payment struct {
 	DebtMode    string    `json:"debtMode"`
 }
 
+type PaymentCreateResponse struct {
+	ID   uint   `json:"id"`
+	Info string `json:"info"`
+}
+
 type PaymentResponse struct {
 	ID          uint            `json:"id"`
 	Amount      decimal.Decimal `json:"amount"`

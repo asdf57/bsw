@@ -240,20 +240,22 @@ func startOfDay(t time.Time) time.Time {
 }
 
 func HandleAddPaymentModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) error {
-	payer, ok := PayerFromModalCustomID(i.ModalSubmitData().CustomID)
+	payer, currency, ok := PaymentContextFromModalCustomID(i.ModalSubmitData().CustomID)
 	if !ok {
 		return shared.RespondWithMessage(s, i, "invalid payment modal metadata; please run `/payment` again")
 	}
 
 	values := shared.ExtractModalValues(i.ModalSubmitData())
-	currency := shared.NormalizePaymentCurrency(values["currency"])
-
-	amount, err := strconv.ParseFloat(strings.TrimSpace(values["amount"]), 64)
+	amount, err := parseAmountInput(values["amount"])
 	if err != nil {
-		return shared.RespondWithMessage(s, i, fmt.Sprintf("invalid amount: %s", err.Error()))
+		return shared.RespondWithMessage(s, i, err.Error())
 	}
 	if amount < 0 {
 		return shared.RespondWithMessage(s, i, fmt.Sprintf("amount cannot be negative: %f", amount))
+	}
+	paymentDate, err := parsePaymentDate(values["date"], time.Now().UTC())
+	if err != nil {
+		return shared.RespondWithMessage(s, i, err.Error())
 	}
 
 	tags := normalizeTags(shared.SplitCSV(values["tags"]))
@@ -266,11 +268,47 @@ func HandleAddPaymentModalSubmit(s *discordgo.Session, i *discordgo.InteractionC
 		filtered = append(filtered, debtor)
 	}
 
-	req := apimodels.Payment{Amount: amount, Payer: payer, Description: strings.TrimSpace(values["description"]), Date: time.Now().UTC(), Currency: currency, Debtors: filtered, Tags: tags, DebtMode: "equal"}
-	if err := shared.CreatePayment(&req); err != nil {
-		return shared.RespondWithEmbed(s, i, CreatedEmbed(req, err))
+	req := apimodels.Payment{Amount: amount, Payer: payer, Description: strings.TrimSpace(values["description"]), Date: paymentDate, Currency: shared.NormalizePaymentCurrency(currency), Debtors: filtered, Tags: tags, DebtMode: "equal"}
+	created, err := shared.CreatePayment(&req)
+	if err != nil {
+		return shared.RespondWithEmbed(s, i, CreatedEmbed(req, 0, err))
 	}
-	return shared.RespondWithEmbed(s, i, CreatedEmbed(req, nil))
+	return shared.RespondWithEmbed(s, i, CreatedEmbed(req, created.ID, nil))
+}
+
+func HandleCurrencySelected(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	data := i.MessageComponentData()
+	if data.CustomID != CurrencySelectID {
+		return nil
+	}
+	if len(data.Values) == 0 || strings.TrimSpace(data.Values[0]) == "" {
+		return shared.RespondWithMessage(s, i, "Select a currency to continue.")
+	}
+	return UpdatePaymentPayerPicker(s, i, data.Values[0])
+}
+
+func parseAmountInput(input string) (float64, error) {
+	amount, err := strconv.ParseFloat(strings.TrimSpace(input), 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid amount: %s", err.Error())
+	}
+	return amount, nil
+}
+
+func parsePaymentDate(input string, defaultTime time.Time) (time.Time, error) {
+	cleaned := strings.TrimSpace(input)
+	if cleaned == "" {
+		return defaultTime.UTC(), nil
+	}
+
+	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04", "2006-01-02"} {
+		parsed, err := time.Parse(layout, cleaned)
+		if err == nil {
+			return parsed.UTC(), nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("invalid payment date: use YYYY-MM-DD, YYYY-MM-DD HH:MM, or RFC3339")
 }
 
 func HandleEditPaymentCommand(s *discordgo.Session, i *discordgo.InteractionCreate) error {
@@ -351,14 +389,15 @@ func HandleDeletePayment(s *discordgo.Session, i *discordgo.InteractionCreate) e
 
 func HandlePayerSelected(s *discordgo.Session, i *discordgo.InteractionCreate) error {
 	data := i.MessageComponentData()
-	if data.CustomID != PayerSelectID {
+	currency, ok := CurrencyFromPayerSelectCustomID(data.CustomID)
+	if !ok {
 		return nil
 	}
 	if len(data.Values) == 0 || strings.TrimSpace(data.Values[0]) == "" {
 		return shared.RespondWithMessage(s, i, "Select a payer to continue.")
 	}
 	payer := strings.TrimSpace(data.Values[0])
-	if err := OpenAddPaymentModal(s, i, payer); err != nil {
+	if err := OpenAddPaymentModal(s, i, payer, currency); err != nil {
 		return err
 	}
 	if i.Message != nil && i.ChannelID != "" && i.Message.ID != "" {

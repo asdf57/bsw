@@ -22,8 +22,9 @@ type DebtResponse struct {
 }
 
 type SettleDebtsRequest struct {
-	OwedBy string `json:"owedBy" binding:"required"`
-	OwedTo string `json:"owedTo"`
+	OwedBy string           `json:"owedBy" binding:"required"`
+	OwedTo string           `json:"owedTo"`
+	Amount *decimal.Decimal `json:"amount,omitempty"`
 }
 
 type SettleDebtsResponse struct {

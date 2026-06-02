@@ -159,29 +159,34 @@ func CreateTag(name string) (*apimodels.TagResponse, error) {
 	return &tag, nil
 }
 
-func CreatePayment(payment *apimodels.Payment) error {
+func CreatePayment(payment *apimodels.Payment) (*apimodels.PaymentCreateResponse, error) {
 	apiURL, err := apiURL()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	body, err := json.Marshal(payment)
 	if err != nil {
-		return fmt.Errorf("failed to marshall payment json")
+		return nil, fmt.Errorf("failed to marshall payment json")
 	}
 
 	resp, err := http.Post(apiURL+"/api/v1/payment", "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		return fmt.Errorf("failed to create payment")
+		return nil, fmt.Errorf("failed to create payment")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("unexpected status code: %d %s: %s", resp.StatusCode, resp.Status, string(respBody))
+		return nil, fmt.Errorf("unexpected status code: %d %s: %s", resp.StatusCode, resp.Status, string(respBody))
 	}
 
-	return nil
+	var created apimodels.PaymentCreateResponse
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		return nil, fmt.Errorf("error decoding payment creation response: %w", err)
+	}
+
+	return &created, nil
 }
 
 func DeletePayment(paymentID uint) error {
@@ -247,12 +252,19 @@ func UpdatePayment(paymentID uint, payment *apimodels.Payment) (*apimodels.Payme
 }
 
 func SettleDebts(owedBy string, owedTo string) (*apimodels.SettleDebtsResponse, error) {
+	return SettleDebtAmount(owedBy, owedTo, "")
+}
+
+func SettleDebtAmount(owedBy string, owedTo string, amount string) (*apimodels.SettleDebtsResponse, error) {
 	apiURL, err := apiURL()
 	if err != nil {
 		return nil, err
 	}
 
-	payload := apimodels.SettleDebtsRequest{OwedBy: owedBy, OwedTo: owedTo}
+	payload := map[string]any{"owedBy": owedBy, "owedTo": owedTo}
+	if strings.TrimSpace(amount) != "" {
+		payload["amount"] = strings.TrimSpace(amount)
+	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal settle payload: %w", err)

@@ -141,12 +141,23 @@ func (h *Handlers) SettleDebts(c *gin.Context) {
 		owedToUser = user
 		owedToID = &user.ID
 	}
+	if settlePayload.Amount != nil && owedToID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "owedTo is required when amount is provided"})
+		return
+	}
+	if settlePayload.Amount != nil && settlePayload.Amount.LessThan(decimal.NewFromFloat(0.01)) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "settlement amount must be at least 0.01"})
+		return
+	}
 
 	var settlements []dbmodels.SettlementDBEntry
 	err = h.Db.DB.Transaction(func(tx *gorm.DB) error {
 		debtsToSettle, err := ds.DebtsToSettle(tx, owedByID, owedToID)
 		if err != nil {
 			return err
+		}
+		if settlePayload.Amount != nil && len(debtsToSettle) != 1 {
+			return fmt.Errorf("no debt from %s to %s to settle", owedByName, owedToName)
 		}
 
 		settlements = make([]dbmodels.SettlementDBEntry, 0, len(debtsToSettle))
@@ -160,11 +171,18 @@ func (h *Handlers) SettleDebts(c *gin.Context) {
 				}
 				owedToForDebt = &user
 			}
+			amount := debt.NetAmount.Abs()
+			if settlePayload.Amount != nil {
+				if settlePayload.Amount.GreaterThan(amount) {
+					return fmt.Errorf("settlement amount cannot exceed %s", amount.StringFixed(2))
+				}
+				amount = *settlePayload.Amount
+			}
 
 			settlements = append(settlements, dbmodels.SettlementDBEntry{
 				OwedByID: owedByID,
 				OwedToID: owedToIDForDebt,
-				Amount:   debt.NetAmount.Abs(),
+				Amount:   amount,
 				Currency: debt.Currency,
 				Date:     time.Now().UTC(),
 			})
@@ -190,6 +208,10 @@ func (h *Handlers) SettleDebts(c *gin.Context) {
 			for idx := range settlements {
 				settlements[idx].Model = rows[idx].Model
 			}
+		}
+
+		if settlePayload.Amount != nil {
+			return ds.SettleDebtAmount(tx, debtsToSettle[0], *settlePayload.Amount)
 		}
 
 		_, err = ds.SettleDebts(tx, owedByID, owedToID)

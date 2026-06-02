@@ -18,8 +18,8 @@ func OnInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		data := i.ApplicationCommandData()
 		switch data.Name {
 		case "payment":
-			if err := payment.OpenPaymentPayerPicker(s, i); err != nil {
-				log.Printf("open modal failed: %v", err)
+			if err := payment.OpenPaymentCurrencyPicker(s, i); err != nil {
+				log.Printf("open payment currency picker failed: %v", err)
 			}
 		case "addtag":
 			if err := tag.OpenCreateTagModal(s, i); err != nil {
@@ -37,9 +37,9 @@ func OnInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			if err := debt.OpenStatsModal(s, i); err != nil {
 				log.Printf("stats failed: %v", err)
 			}
-		case "settlements":
+		case "getsettlements":
 			if err := debt.HandleSettlements(s, i); err != nil {
-				log.Printf("settlements failed: %v", err)
+				log.Printf("getsettlements failed: %v", err)
 			}
 		case "delpayment":
 			if err := payment.HandleDeletePayment(s, i); err != nil {
@@ -53,9 +53,13 @@ func OnInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			if err := user.OpenCreateUserModal(s, i); err != nil {
 				log.Printf("adduser failed: %v", err)
 			}
-		case "settle":
-			if err := debt.OpenSettleModal(s, i); err != nil {
-				log.Printf("settle failed: %v", err)
+		case "settleall":
+			if err := debt.OpenSettleAllModal(s, i); err != nil {
+				log.Printf("settleall failed: %v", err)
+			}
+		case "settlecustom":
+			if err := debt.OpenSettleCustomStart(s, i); err != nil {
+				log.Printf("settlecustom failed: %v", err)
 			}
 		case "reversesettlement":
 			if err := debt.HandleReverseSettlement(s, i); err != nil {
@@ -72,8 +76,20 @@ func OnInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		}
 	case discordgo.InteractionMessageComponent:
 		data := i.MessageComponentData()
-		switch data.CustomID {
-		case payment.PayerSelectID:
+		switch {
+		case data.CustomID == debt.SettleCustomOwedBySelectID:
+			if err := debt.HandleSettleCustomOwedBySelected(s, i); err != nil {
+				log.Printf("settle owed-by select failed: %v", err)
+			}
+		case strings.HasPrefix(data.CustomID, debt.SettleCustomOwedToPrefix):
+			if err := debt.HandleSettleCustomOwedToSelected(s, i); err != nil {
+				log.Printf("settle owed-to select failed: %v", err)
+			}
+		case data.CustomID == payment.CurrencySelectID:
+			if err := payment.HandleCurrencySelected(s, i); err != nil {
+				log.Printf("payment currency select failed: %v", err)
+			}
+		case strings.HasPrefix(data.CustomID, payment.PayerSelectID):
 			if err := payment.HandlePayerSelected(s, i); err != nil {
 				log.Printf("payment payer select failed: %v", err)
 			}
@@ -101,9 +117,13 @@ func OnInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			if err := tag.HandleCreateTagModalSubmit(s, i); err != nil {
 				log.Printf("addtag modal submit failed: %v", err)
 			}
-		case data.CustomID == debt.SettleModalID:
-			if err := debt.HandleSettleModalSubmit(s, i); err != nil {
-				log.Printf("settle modal submit failed: %v", err)
+		case strings.HasPrefix(data.CustomID, debt.SettleAmountPrefix):
+			if err := debt.HandleSettleAmountModalSubmit(s, i); err != nil {
+				log.Printf("settle amount modal submit failed: %v", err)
+			}
+		case data.CustomID == debt.SettleAllModalID:
+			if err := debt.HandleSettleAllModalSubmit(s, i); err != nil {
+				log.Printf("settleall modal submit failed: %v", err)
 			}
 		case data.CustomID == debt.StatsModalID:
 			if err := debt.HandleStatsModalSubmit(s, i); err != nil {
